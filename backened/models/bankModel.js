@@ -27,7 +27,12 @@ const bankSchema = new mongoose.Schema({
             validate: {
                 validator: function(value) { return value >= this.get('interest.min'); },
                 message: "Maximum interest rate cannot be lower than minimum."
-            }
+            },
+            effective_mid: Number, // This is calculated by middleware
+               moratorium: {
+        interest_type: { type: String, enum: ['simple', 'compound'] },
+        duration_months: Number
+    }
         },
         base_rate: { type: Number }, 
         effective_mid: { type: Number },
@@ -67,11 +72,23 @@ const bankSchema = new mongoose.Schema({
         frequency: { type: String, enum: ['yearly', 'semester'], required: true }
     },
 
-    collateral: {
-        required_above: { type: Number, required: true, min: 0 },
-        type: [{ type: String, enum: ['Property', 'FD', 'Gold', 'Insurance'] }],
-        collateral_required_early: { type: Boolean, default: false }
+    // Inside your bankSchema in models/bankModel.js
+         collateral: {
+    required_above: { 
+        type: Number, 
+        required: true, 
+        min: 0 
     },
+    type: { 
+        type: [String], // This defines it as an array of strings
+        enum: ['Property', 'FD', 'Gold', 'Insurance'],
+        required: true
+    },
+    collateral_required_early: { 
+        type: Boolean, 
+        default: false 
+    }
+},
 
     processing: {
         fee_percent: { type: Number, default: 0, min: 0, max: 5 },
@@ -117,45 +134,40 @@ const bankSchema = new mongoose.Schema({
 });
 
 // --- THE RANKING ENGINE MIDDLEWARE ---
-bankSchema.pre('save', function(next) {
-    if (!this.analytics) this.analytics = {};
-    if (!this.meta) this.meta = {};
-    if (!this.insight_flags) this.insight_flags = {};
+// models/bankModel.js
 
-    this.slug = slugify(this.name, { lower: true, strict: true });
-    this.interest.effective_mid = (this.interest.min + this.interest.max) / 2;
-    if (!this.interest.base_rate) this.interest.base_rate = this.interest.min;
-
-    // Intelligence Flags
-    this.insight_flags.high_risk_compounding = this.interest.moratorium.interest_type === 'compound';
-    this.insight_flags.high_processing_time = this.processing.time_days > 12;
-    this.collateral.collateral_required_early = this.collateral.required_above <= 750000;
-    this.insight_flags.government_backed = this.bank_type === 'public';
-
-    // Advanced Ranking Score
-    const costScore = (15 - this.interest.min) * 0.5;
-    const flexibilityBonus = (this.benefits.flexible_repayment ? 1.5 : 0);
-    const subsidyBonus = (this.subsidy.csis_applicable ? 1.0 : 0);
-    
-    const riskPenalty = (this.insight_flags.high_risk_compounding ? 1.5 : 0);
-    const processingPenalty = (this.processing.fee_percent > 1 ? 0.5 : 0);
-    const collateralPenalty = (this.collateral.collateral_required_early ? 1.0 : 0);
-
-    this.analytics.ranking_score = parseFloat(
-        (costScore + flexibilityBonus + subsidyBonus - riskPenalty - processingPenalty - collateralPenalty).toFixed(2)
-    );
-
-    if (!this.meta.risk_level) {
-        this.meta.risk_level = (this.interest.max > 13 || this.insight_flags.high_risk_compounding) ? "high" : "low";
+bankSchema.pre('save', async function() {
+    // 1. Data Normalization
+    if (this.name) {
+        this.slug = slugify(this.name, { lower: true, strict: true });
     }
-    this.meta.cost_category = this.interest.min <= 9.5 ? "low" : (this.interest.min <= 11.5 ? "medium" : "high");
 
-    const systemTags = [];
-    if (this.insight_flags.government_backed) systemTags.push("Govt-Backed");
-    if (this.insight_flags.high_risk_compounding) systemTags.push("Compounding-Risk");
-    this.tags = [...new Set([...(this.tags || []), ...systemTags])];
+    // 2. Logic for Flags (Set these FIRST)
+    this.insight_flags.government_backed = (this.bank_type === 'public');
+    this.insight_flags.high_processing_time = (this.processing.time_days > 12);
+    this.insight_flags.high_risk_compounding = (this.interest.moratorium.interest_type === 'compound');
+    
+    // Logic for collateral
+    this.collateral.collateral_required_early = (this.collateral.required_above <= 1000000);
 
-    next();
+    // 3. Analytics (The Ranking Engine)
+    this.interest.effective_mid = (this.interest.min + this.interest.max) / 2;
+    
+    let score = (15 - this.interest.min) * 0.8; 
+    if (this.insight_flags.government_backed) score += 1.5;
+    if (this.benefits.flexible_repayment) score += 1.0;
+    if (this.insight_flags.high_risk_compounding) score -= 2.0;
+    if (this.insight_flags.high_processing_time) score -= 0.5;
+
+    this.analytics.ranking_score = parseFloat(score.toFixed(2));
+
+    // 4. Tags (Re-initialize to prevent duplicates)
+    const newTags = [];
+    if (this.insight_flags.government_backed) newTags.push("Govt-Backed");
+    if (this.insight_flags.high_risk_compounding) newTags.push("Compounding-Risk");
+    if (this.interest.min < 9.5) newTags.push("Low-Interest");
+    
+    this.tags = newTags; 
 });
 
 const Bank = mongoose.models.Bank || mongoose.model('Bank', bankSchema);

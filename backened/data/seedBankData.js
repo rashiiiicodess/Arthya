@@ -12,6 +12,7 @@ export const seedBanks = [
         },
         loan: { min_amount: 100000, max_amount: 15000000, margin_money_percent: 5, emi_ready: true },
         disbursement: { type: "progressive", frequency: "semester" },
+       
         collateral: { required_above: 750000, type: ["Property", "FD"] },
         processing: { fee_percent: 0, fee_flat: 0, time_days: 22 },
         subsidy: { csis_applicable: true, income_limit: 450000, covers_moratorium_interest: true },
