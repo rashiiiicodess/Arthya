@@ -1,0 +1,13 @@
+# Secrets
+.env
+backened/.env
+client/client-side/.env
+
+# Dependencies
+node_modules/
+backened/node_modules/
+client/node_modules/
+
+# Build files
+dist/
+.DS_Store
