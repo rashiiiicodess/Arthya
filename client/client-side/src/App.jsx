@@ -8,7 +8,7 @@ import Login from './pages/Login';
 import EmailVerify from './pages/EmailVerify';
 import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
-
+import Analyze from './pages/Analyze';
 
 import Landing from './pages/Landing';
 /*
@@ -36,13 +36,21 @@ const App = () => {
         <Route path="/login" element={<Login />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/email-verify" element={<EmailVerify />} />
-
+         <Route path="/analyze" element={<Analyze/>} />
         {/* --- Protected Routes (The "Auth Wall") --- */}
         <Route 
           path="/dashboard" 
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          } 
+        />
+         <Route 
+          path="/analyze" 
+          element={
+            <ProtectedRoute>
+              <Analyze/>
             </ProtectedRoute>
           } 
         />

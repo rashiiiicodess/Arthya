@@ -10,6 +10,7 @@ import authRouter from "./Routes/authRoutes.js";
 import { dbConnect } from "./config/mongodb.js";
 import userRouter from "./routes/userRoutes.js";
 import BankRouter from "./routes/bankRoutes.js";
+import Analyzerouter from "./routes/analyzeRoutes.js";
 dns.setServers(["1.1.1.1", "8.8.8.8"]);
 
 const app=express();
@@ -30,6 +31,6 @@ app.use(cors({origin:allowedOrigins ,credentials:true}))
 app.use('/api/auth', authRouter);
 app.use('/api/user',userRouter)
 app.use('/api/bank',BankRouter);
-
+app.use("/api/analyze", Analyzerouter);
 
 app.listen(port,()=>console.log(`Server started on PORT:${port}`))
