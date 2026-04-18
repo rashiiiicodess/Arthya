@@ -1,37 +1,23 @@
-import { generateAIInsights } from "../services/aiInsightEngine.js";
-
-export async function generateInsights({
-  overview,
-  loan,
-  disbursement,
-  input
-}) {
+// utils/insightEngine.js
+export function generateInsights({ overview, loan, disbursement, input }) {
+  // Initialize with empty arrays so the frontend always has a structure to map over
   const insights = {
     critical: [],
     warnings: [],
     suggestions: [],
-    ai: [] // 🔥 NEW
+    ai: [] 
   };
 
-  const {
-    emi,
-    monthlyShortfall,
-    interestMultiplier
-  } = overview;
+  // Safety check: if overview is missing, return empty structure early
+  if (!overview) return insights;
 
+  const { emi, monthlyShortfall, interestMultiplier } = overview;
   const totalRepayment = loan.totalRepayment;
-
-  const totalInterest =
-    loan.interestDuringRepayment +
-    disbursement.moratoriumInterest;
-
+  const totalInterest = loan.interestDuringRepayment + disbursement.moratoriumInterest;
   const salary = input.salary;
   const principal = input.totalLoan;
 
-  // =========================
-  // 🚨 CRITICAL
-  // =========================
-
+  // 🚨 CRITICAL: EMI exceeds Salary
   if (monthlyShortfall < 0) {
     insights.critical.push({
       title: "Financially Unsustainable",
@@ -42,76 +28,37 @@ export async function generateInsights({
     });
   }
 
-  // =========================
-  // ⚠️ WARNINGS
-  // =========================
-
+  // ⚠️ WARNING: High EMI Ratio (moved to 40% for better sensitivity)
   const emiRatio = emi / salary;
-
-  if (emiRatio > 0.5) {
+  if (emiRatio > 0.4) {
     insights.warnings.push({
       title: "High EMI Burden",
       why: `${Math.round(emiRatio * 100)}% of income`,
-      impact: "Low savings buffer",
-      action: "Extend tenure or reduce loan",
+      impact: "Very low savings buffer for emergencies",
+      action: "Extend tenure or provide more margin money",
       severity: "medium"
     });
   }
 
+  // ⚠️ WARNING: High Multiplier
   if (interestMultiplier > 1.7) {
     insights.warnings.push({
       title: "High Total Cost",
-      why: `₹${totalRepayment.toLocaleString()} on ₹${principal.toLocaleString()}`,
-      impact: "Majority paid as interest",
-      action: "Consider prepayment",
+      why: `You pay ₹${interestMultiplier} for every ₹1 borrowed`,
+      impact: "Total repayment is significantly higher than principal",
+      action: "Plan aggressive prepayments after graduation",
       severity: "medium"
     });
   }
 
-  if (totalInterest > principal * 0.25) {
-    insights.warnings.push({
-      title: "Heavy Interest Accumulation",
-      why: "Moratorium + repayment interest",
-      impact: `Loan grows significantly before payoff`,
-      action: "Pay early interest if possible",
-      severity: "high"
-    });
-  }
-
-  // =========================
   // 💡 SUGGESTIONS
-  // =========================
-
   insights.suggestions.push({
     title: "Prepay Early",
-    why: "Interest is front-loaded",
-    impact: "Reduces long-term cost",
-    action: "Use bonuses for prepayment",
+    why: "Interest is front-loaded in the schedule",
+    impact: "Reduces total interest by lakhs",
+    action: "Use joining bonuses for one-time prepayments",
     severity: "low"
   });
 
-  if (!input.csisEligible) {
-    insights.suggestions.push({
-      title: "Check CSIS Subsidy",
-      why: "Govt covers moratorium interest",
-      impact: "Can save lakhs",
-      action: "Apply if eligible",
-      severity: "low"
-    });
-  }
-
-  // =========================
-  // 🤖 AI INSIGHTS (NEW)
-  // =========================
-
-  /**const aiInsights = await generateAIInsights({
-    overview,
-    loan,
-    disbursement,
-    input
-  });
-
-  insights.ai = aiInsights;**/
-
-  return insights;
+  return insights; // Ensure this is always returned
 }

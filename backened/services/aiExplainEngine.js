@@ -1,87 +1,60 @@
-import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import dotenv from "dotenv";
+dotenv.config();
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-export async function generateAIExplanation({
-  overview,
-  insights,
-  loan,
-  disbursement,
-  input
-}) {
+const model = genAI.getGenerativeModel(
+  { model: "gemini-2.5-flash" }, 
+  { apiVersion: "v1" }
+);
+
+export async function generateAIExplanation({ overview, insights, disbursement, input }) {
   try {
+    if (!process.env.GEMINI_API_KEY) return "Advisor offline: Missing API Key.";
+
+    // 1. Pre-calculate the burden percentage strictly before the prompt
+    // This ensures emiBurden is defined for the template literal
+    const emiValue = overview.emi || 0;
+    const salaryValue = input.salary || 1; // Prevent division by zero
+    const emiBurden = Math.round((emiValue / salaryValue) * 100);
+
+    // 2. Build the prompt using the calculated value
     const prompt = `
-You are a brutally honest financial advisor.
+      You are Arthya AI, a brutally honest Indian financial advisor. 
+      Your goal is to deconstruct an education loan for a student, focusing on the cold, hard math provided.
 
-Explain this education loan in a clear, human, slightly harsh but helpful tone.
+      --- DATA POINTS (USE THESE ONLY) ---
+      Monthly Salary: ₹${input.salary}
+      Monthly EMI: ₹${overview.emi}
+      Loan Principal: ₹${input.totalLoan}
+      Total Repayment: ₹${overview.totalRepayment}
+      Total Interest: ₹${overview.totalInterest}
+      Interest Multiplier: ${overview.interestMultiplier}x
+      Loan Tenure: ${overview.years} years
+      Moratorium Interest Added: ₹${disbursement.moratoriumInterest}
 
-USER PROFILE:
-- Salary: ₹${input.salary}
-- Loan: ₹${input.totalLoan}
-- Interest Rate: ${input.annualRate}%
-- Tenure: ${input.tenureMonths} months
+      --- MANDATORY CONSTRAINTS ---
+      1. FACTUAL ACCURACY: Do NOT invent or exaggerate the tenure or interest rate. If the data says ${overview.years} years, use exactly that. 
+      2. CURRENCY: Always use the ₹ symbol for amounts.
+      3. TONE: Human, slightly harsh, but helpful. No corporate jargon.
 
-LOAN SUMMARY:
-- EMI: ₹${overview.emi}
-- Total Repayment: ₹${overview.totalRepayment}
-- Interest Multiplier: ${overview.interestMultiplier}x
-- Verdict: ${overview.verdict}
+      --- RESPONSE STRUCTURE ---
+      1. IS THIS SAFE OR A DEBT TRAP?: Analyze the EMI-to-Salary ratio. (Spending ${emiBurden}% of income).
+      2. THE "HIDDEN COST": Explain what the ${overview.interestMultiplier}x multiplier really means for their future. Focus on the ₹${overview.totalInterest} they are paying just for the "privilege" of borrowing.
+      3. SURVIVAL AFTER EMI: Calculate what is left (₹${overview.monthlyShortfall}) and describe the lifestyle reality in an Indian city with that amount.
+      4. FINAL VERDICT: A one-line, cold-truth summary.
 
-RISK:
-- Monthly Surplus/Deficit: ₹${overview.monthlyShortfall}
-- Affordability Score: ${overview.affordabilityScore}/100
+      Keep the response concise and scannable.
+    `;
 
-MORATORIUM IMPACT:
-- Interest Added Before EMI: ₹${disbursement.moratoriumInterest}
-
-CRITICAL INSIGHTS:
-${(insights?.critical || []).map(i => `- ${i.title}`).join("\n")}
-
-WARNINGS:
-${(insights?.warnings || []).map(i => `- ${i.title}`).join("\n")}
-
-SUGGESTIONS:
-${(insights?.suggestions || []).map(i => `- ${i.title}`).join("\n")}
-
----
-
-Now explain:
-
-1. Is this loan safe or dangerous?
-2. What will happen month-to-month?
-3. Biggest mistake user is making
-4. What they should do instead
-5. Final verdict (1 line)
-
-Keep it concise but powerful.
-`;
-
-    const response = await client.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: "You are an expert Indian financial advisor."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.7
-    });
-
-    return {
-      explanation: response.choices[0].message.content
-    };
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text();
 
   } catch (error) {
-    console.error("AI Explanation Error:", error.message);
-
-    return {
-      explanation: "AI explanation temporarily unavailable."
-    };
+    console.error("Gemini Explanation Error:", error.message);
+    // Dynamic fallback that doesn't rely on emiBurden if it fails
+    return `Advisor Note: This ${overview.interestMultiplier}x loan is ${overview.verdict}. You'll pay ₹${overview.totalInterest.toLocaleString()} in interest over ${overview.years} years. Don't just pay the minimum!`;
   }
 }
