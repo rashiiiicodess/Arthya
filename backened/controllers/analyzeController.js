@@ -1,31 +1,23 @@
 import Bank from "../models/bankModel.js";
 import { analyzeLoan } from "../services/loanAnalysis.services.js";
 
-/**
- * Main analysis controller.
- * 1. Fetches all banks from DB.
- * 2. Runs fast math-only analysis for all banks.
- * 3. Sorts to find the best deal.
- * 4. Triggers AI only for the top recommendation.
- */
-// ... existing imports ...
-
 export const analyzeController = async (req, res) => {
   try {
     const input = req.body;
+    const userGender = input.gender?.toLowerCase() || 'male';
 
     // 1. Validation
     if (!input.disbursements || !Array.isArray(input.disbursements)) {
       return res.status(400).json({ success: false, error: "Missing disbursements data." });
     }
 
-    // 2. Fetch Banks
+    // 2. Fetch Banks from DB
     const banks = await Bank.find();
     if (!banks || banks.length === 0) {
       return res.status(404).json({ success: false, error: "No bank data found." });
     }
 
-    // 3. Fast Math Pass (includeAI = false)
+    // 3. Normalize Input (Semester/Tranche logic)
     const normalizedInput = {
       ...input,
       disbursements: input.disbursements.map(d => ({
@@ -34,14 +26,20 @@ export const analyzeController = async (req, res) => {
       }))
     };
 
+    // 4. Fast Math Pass (AI = false) for all banks
     const results = await Promise.all(
       banks.map(async (bank) => {
-        // 🔥 ADDED FIX HERE: processing.fee_percent
+        // Calculate Female Student Concession (usually 0.50%)
+        const femaleDiscount = (userGender === 'female' && bank.benefits?.women_discount_percent) 
+          ? bank.benefits.women_discount_percent 
+          : 0;
+
         const analysis = await analyzeLoan({
           ...normalizedInput,
-          annualRate: bank.interest.effective_mid,
-          processingFeePercent: bank.processing?.fee_percent || 0 
-        },bank, false);
+          annualRate: bank.interest.effective_mid - femaleDiscount, // Apply discount
+          processingFeePercent: bank.processing?.fee_percent || 0,
+          maxFeeCap: bank.processing?.fee_flat_max || 0 // Pass Cap for GST logic
+        }, bank, false);
 
         return {
           bankName: bank.name,
@@ -52,7 +50,7 @@ export const analyzeController = async (req, res) => {
       })
     );
 
-    // 4. Data Refinement & Sort
+    // 5. Data Refinement & Sort by Total Cost
     const processedResults = results.map(r => ({
       ...r,
       loan: { ...r.loan, schedule: r.loan.schedule?.slice(0, 12) || [] }
@@ -64,28 +62,39 @@ export const analyzeController = async (req, res) => {
       return totalA - totalB;
     });
 
-    // 5. Trigger AI ONLY for the #1 Recommended Bank
-    const bestBank = processedResults[0];
-    
+    // 6. Trigger Decision Engine AI for the #1 Recommended Bank
+    const recommendedBank = processedResults[0];
+    const worstBank = processedResults[processedResults.length - 1]; 
+    const expensiveNames = processedResults.slice(-2).map(b => b.bankName).join(" and ");
+
     try {
-      // 🔥 ADDED FIX HERE: normalizedInput and processing.fee_percent
+      const winnerBankRaw = recommendedBank.bankRawInfo;
+      const femaleDiscount = (userGender === 'female' && winnerBankRaw.benefits?.women_discount_percent) 
+        ? winnerBankRaw.benefits.women_discount_percent 
+        : 0;
+
+      // Call AI with "Comparison Context"
       const aiEnriched = await analyzeLoan({
         ...normalizedInput, 
-        annualRate: bestBank.bankRawInfo.interest.effective_mid,
-        processingFeePercent: bestBank.bankRawInfo.processing?.fee_percent || 0
-      },bestBank.bankRawInfo, true); 
+        annualRate: winnerBankRaw.interest.effective_mid - femaleDiscount,
+        processingFeePercent: winnerBankRaw.processing?.fee_percent || 0,
+        maxFeeCap: winnerBankRaw.processing?.fee_flat_max || 0,
+        // Passing these variables for the enhanced prompt
+        maxRepayment: worstBank.overview.totalRepayment, 
+        alternatives: expensiveNames 
+      }, winnerBankRaw, true); 
 
-      processedResults[0].insights.ai = aiEnriched.insights.ai;
-      processedResults[0].aiExplanation = aiEnriched.aiExplanation;
+      recommendedBank.insights.ai = aiEnriched.insights.ai;
+      recommendedBank.aiExplanation = aiEnriched.aiExplanation;
     } catch (aiErr) {
-      console.warn("⚠️ AI Service skipped for top bank.");
+      console.warn("⚠️ AI Decision Logic failed, using math fallback.", aiErr.message);
     }
 
-    // 6. Return payload
+    // 7. Return Final Payload
     res.status(200).json({
       success: true,
       results: processedResults,
-      recommended: processedResults[0]
+      recommended: recommendedBank
     });
 
   } catch (err) {

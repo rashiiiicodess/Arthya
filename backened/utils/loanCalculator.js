@@ -5,13 +5,26 @@ export function calculateLoan({
   emiStartAfterMonths = 0,
   prepayments = [],
   rateChanges = [],
-  processingFeePercent = 0
+  processingFeePercent = 0,
+  maxFeeCap = 0
 }) {
   let monthlyRate = annualRate / 12 / 100;
 
-  const processingFee = (principal * processingFeePercent) / 100;
-  const netDisbursed = principal - processingFee;
+ const GST_RATE = 1.18; // 18% GST
 
+  // Calculate fee based on %
+  let rawFee = (principal * processingFeePercent) / 100;
+
+  // Apply the Bank's Maximum Cap (if defined)
+  if (maxFeeCap > 0 && rawFee > maxFeeCap) {
+    rawFee = maxFeeCap;
+  }
+
+  // Calculate final fee including GST
+  const processingFee = Math.round(rawFee * GST_RATE);
+  
+  // What the student actually receives
+  const netDisbursed = principal - processingFee;
   let emi =
     monthlyRate === 0
       ? principal / tenureMonths
@@ -97,12 +110,12 @@ export function calculateLoan({
     if (currentBalance <= 0) break;
   }
 
-  return {
+ return {
     emi,
     netDisbursed: Math.round(netDisbursed),
-    processingFee: Math.round(processingFee),
+    processingFee: Math.round(processingFee), // Now contains GST
     totalRepayment: schedule.reduce((s, m) => s + m.emi, 0),
-    interestDuringRepayment: Math.round(totalInterest), // ✅ FIXED NAME
+    interestDuringRepayment: Math.round(totalInterest),
     schedule
   };
 }

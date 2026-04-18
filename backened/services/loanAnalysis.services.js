@@ -5,6 +5,8 @@ import { calculateLoan } from "../utils/loanCalculator.js";
 import { calculateDisbursement } from "../utils/disburmentCalculator.js";
 import { generateAIExplanation } from "./aiExplainEngine.js";
 import { generateAIInsights } from "./aiInsightEngine.js";
+import { generateInvestmentGuidance } from "../utils/investmentEngine.js";
+
 
 /**
  * Analyzes a loan configuration by calculating math, 
@@ -32,6 +34,10 @@ export async function analyzeLoan(input,bankData = null, includeAI = true) {
     moratoriumType,
     csisEligible: rest.csisEligible
   });
+  const investmentGuidance = generateInvestmentGuidance({ 
+  overview, 
+  salary: input.salary 
+});
 
   const loanResult = calculateLoan({
     principal: disbursementResult.effectivePrincipal,
@@ -125,6 +131,7 @@ export async function analyzeLoan(input,bankData = null, includeAI = true) {
       suggestions: hardInsights.suggestions || [],
       ai: aiInsightsResult || []
     },
-    aiExplanation: aiExplanationResult
+    aiExplanation: aiExplanationResult,
+    investmentGuidance
   };
 }

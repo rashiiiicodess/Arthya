@@ -20,6 +20,10 @@ export async function generateAIExplanation({ overview, insights, disbursement, 
     const emiBurden = Math.round((emiValue / salaryValue) * 100);
 
     // 2. Build the prompt using the calculated value
+   // Add this to your variable definitions at the top of generateAIExplanation
+    const savingsAmount = input.maxRepayment ? input.maxRepayment - overview.totalRepayment : 0;
+    const alternativesText = input.alternatives || "other banks";
+
     const prompt = `
       You are Arthya AI, a brutally honest Indian financial advisor. 
       Your goal is to deconstruct an education loan for a student, focusing on the cold, hard math provided.
@@ -33,6 +37,7 @@ export async function generateAIExplanation({ overview, insights, disbursement, 
       Interest Multiplier: ${overview.interestMultiplier}x
       Loan Tenure: ${overview.years} years
       Moratorium Interest Added: ₹${disbursement.moratoriumInterest}
+      Estimated Savings vs Worst Option: ₹${savingsAmount}
 
       --- MANDATORY CONSTRAINTS ---
       1. FACTUAL ACCURACY: Do NOT invent or exaggerate the tenure or interest rate. If the data says ${overview.years} years, use exactly that. 
@@ -43,11 +48,16 @@ export async function generateAIExplanation({ overview, insights, disbursement, 
       1. IS THIS SAFE OR A DEBT TRAP?: Analyze the EMI-to-Salary ratio. (Spending ${emiBurden}% of income).
       2. THE "HIDDEN COST": Explain what the ${overview.interestMultiplier}x multiplier really means for their future. Focus on the ₹${overview.totalInterest} they are paying just for the "privilege" of borrowing.
       3. SURVIVAL AFTER EMI: Calculate what is left (₹${overview.monthlyShortfall}) and describe the lifestyle reality in an Indian city with that amount.
-      4. FINAL VERDICT: A one-line, cold-truth summary.
+      
+      --- NEW: COMPARISON STRATEGY (ADD THESE SECTIONS) ---
+      4. WHY THIS IS THE BEST CHOICE: Explicitly state why this bank won. Mention that it saves the user ₹${savingsAmount.toLocaleString()} compared to the most expensive options like ${alternativesText}.
+      5. CONSIDER AVOIDING: Briefly mention that banks like ${alternativesText} are significantly more expensive and should be avoided unless this bank rejects them.
+      
+      --- WRAP UP ---
+      6. FINAL VERDICT: A one-line, cold-truth summary.
 
-      Keep the response concise and scannable.
+      Keep the response concise and scannable using Markdown headings.
     `;
-
     const result = await model.generateContent(prompt);
     const response = await result.response;
     return response.text();
