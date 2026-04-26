@@ -37,6 +37,11 @@ const userSchema=new mongooose.Schema({
         type:Number,
         default:0
     }
+    ,
+    lastAnalysisInput: {
+    type: Object,
+    default: null // Will store totalLoan, salary, tenure, etc.
+  }
 
 })
 const userModal=mongooose.models.user ||mongooose.model('user',userSchema);

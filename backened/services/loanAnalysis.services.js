@@ -7,16 +7,15 @@ import { generateAIExplanation } from "./aiExplainEngine.js";
 import { generateAIInsights } from "./aiInsightEngine.js";
 import { generateInvestmentGuidance } from "../utils/investmentEngine.js";
 
-
 /**
  * Analyzes a loan configuration by calculating math, 
  * generating hardcoded logic insights, and fetching AI analysis.
  */
-export async function analyzeLoan(input,bankData = null, includeAI = true) {
+export async function analyzeLoan(input, bankData = null, includeAI = true) {
   const {
     totalLoan,
     annualRate,
-    tenMonths, // Ensure this matches your input schema (usually tenureMonths)
+    tenMonths, 
     tenureMonths,
     moratoriumMonths,
     moratoriumType,
@@ -25,7 +24,8 @@ export async function analyzeLoan(input,bankData = null, includeAI = true) {
     ...rest
   } = input;
 
-  // 1. Math Engines: Calculate core numbers
+  // --- STEP 1: CORE MATH ENGINES ---
+  // Calculate principal growth during the study period
   const disbursementResult = calculateDisbursement({
     totalLoan,
     annualRate,
@@ -34,11 +34,8 @@ export async function analyzeLoan(input,bankData = null, includeAI = true) {
     moratoriumType,
     csisEligible: rest.csisEligible
   });
-  const investmentGuidance = generateInvestmentGuidance({ 
-  overview, 
-  salary: input.salary 
-});
 
+  // Calculate the monthly EMI and repayment schedule
   const loanResult = calculateLoan({
     principal: disbursementResult.effectivePrincipal,
     annualRate,
@@ -46,12 +43,20 @@ export async function analyzeLoan(input,bankData = null, includeAI = true) {
     ...rest
   });
 
-  // 2. Summary Engines: Organize totals and timelines
+  // --- STEP 2: SUMMARY ENGINES (DEPENDS ON MATH) ---
+  // Generate the overview first so other engines can use its values
   const overview = generateOverview({
     loan: loanResult,
     disbursement: disbursementResult,
     salary,
     input
+  });
+
+  // --- STEP 3: LOGIC ENGINES (DEPENDS ON OVERVIEW) ---
+  // Now it is safe to generate guidance and insights
+  const investmentGuidance = generateInvestmentGuidance({ 
+    overview, 
+    salary: input.salary 
   });
 
   const breakdown = generateBreakdown({
@@ -60,7 +65,6 @@ export async function analyzeLoan(input,bankData = null, includeAI = true) {
     input
   });
 
-  // 3. Local Insight Engine: Triggers hardcoded financial warnings
   const hardInsights = generateInsights({
     overview,
     loan: loanResult,
@@ -68,19 +72,18 @@ export async function analyzeLoan(input,bankData = null, includeAI = true) {
     input
   }) || { critical: [], warnings: [], suggestions: [], ai: [] };
 
-  // Debug Logs
-  console.log("--- INSIGHT DEBUG ---");
-  console.log("Verdict:", overview.verdict);
-  console.log("Interest Multiplier:", overview.interestMultiplier);
-  console.log("Critical Count:", hardInsights.critical?.length || 0);
-  console.log("Warning Count:", hardInsights.warnings?.length || 0);
-  console.log("----------------------");
+  // --- STEP 4: DEBUG LOGGING ---
+  console.log("--- ANALYSIS DEBUG ---");
+  console.log(`Bank: ${bankData?.name || "Generic"}`);
+  console.log(`Verdict: ${overview.verdict}`);
+  console.log(`Multiplier: ${overview.interestMultiplier}x`);
+  console.log("-----------------------");
 
-  // 4. AI Preparation: Prepare a "Slim Context"
+  // --- STEP 5: AI PREPARATION ---
   const aiContext = {
     overview,
     input,
-   bankMeta: bankData ? {
+    bankMeta: bankData ? {
       bankName: bankData.name,
       interestType: bankData.interest?.type || "floating",
       collateralRequired: (bankData.collateral?.required_above || 0) < totalLoan,
@@ -95,8 +98,7 @@ export async function analyzeLoan(input,bankData = null, includeAI = true) {
   let aiInsightsResult = [];
   let aiExplanationResult = "AI Advisor is analyzing your data...";
 
-  // 5. AI Engines: Fetch narrative and pro-tips
-  // NOTE: includeAI is used to prevent rate-limiting when looping through multiple banks
+  // --- STEP 6: AI ENGINES (CONDITIONAL) ---
   if (includeAI && process.env.GEMINI_API_KEY) {
     try {
       const [insightsRes, explainRes] = await Promise.all([
@@ -106,20 +108,15 @@ export async function analyzeLoan(input,bankData = null, includeAI = true) {
       aiInsightsResult = insightsRes;
       aiExplanationResult = explainRes;
     } catch (aiErr) {
-      if (aiErr.message.includes("429") || aiErr.message.includes("quota")) {
-        console.log("⚠️ Gemini Rate Limit - Falling back to local logic.");
-      } else if (aiErr.message.includes("404")) {
-        console.log("⚠️ Gemini Model ID Mismatch - Check apiVersion settings.");
-      } else {
-        console.error("AI Error:", aiErr.message);
-      }
-      aiExplanationResult = `Advisor Note: This ${overview.interestMultiplier}x loan is ${overview.verdict}. The ₹${disbursementResult.moratoriumInterest.toLocaleString()} moratorium cost is high; consider early interest payments.`;
+      console.warn("⚠️ AI Engine Error:", aiErr.message);
+      // Fallback message so UI doesn't break
+      aiExplanationResult = `Advisor Note: This ${overview.interestMultiplier}x loan is ${overview.verdict}. You will pay ₹${disbursementResult.moratoriumInterest.toLocaleString()} just in moratorium interest.`;
     }
   } else {
-    aiExplanationResult = "AI Analysis skipped for this comparison tier.";
+    aiExplanationResult = "Detailed AI Analysis skipped for this view.";
   }
 
-  // 6. Final Combined Output
+  // --- STEP 7: FINAL STRUCTURED OUTPUT ---
   return {
     disbursement: disbursementResult,
     loan: loanResult,

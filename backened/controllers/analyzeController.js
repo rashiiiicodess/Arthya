@@ -1,23 +1,16 @@
 import Bank from "../models/bankModel.js";
 import { analyzeLoan } from "../services/loanAnalysis.services.js";
-
+import userModal from "../models/userModel.js";
 export const analyzeController = async (req, res) => {
   try {
     const input = req.body;
+  
     const userGender = input.gender?.toLowerCase() || 'male';
 
     // 1. Validation
     if (!input.disbursements || !Array.isArray(input.disbursements)) {
       return res.status(400).json({ success: false, error: "Missing disbursements data." });
     }
-
-    // 2. Fetch Banks from DB
-    const banks = await Bank.find();
-    if (!banks || banks.length === 0) {
-      return res.status(404).json({ success: false, error: "No bank data found." });
-    }
-
-    // 3. Normalize Input (Semester/Tranche logic)
     const normalizedInput = {
       ...input,
       disbursements: input.disbursements.map(d => ({
@@ -26,6 +19,17 @@ export const analyzeController = async (req, res) => {
       }))
     };
 
+    await userModal.findByIdAndUpdate(req.body.userId, {
+      lastAnalysisInput: normalizedInput 
+    });
+
+    // 2. Fetch Banks from DB
+    const banks = await Bank.find();
+    if (!banks || banks.length === 0) {
+      return res.status(404).json({ success: false, error: "No bank data found." });
+    }
+
+ 
     // 4. Fast Math Pass (AI = false) for all banks
     const results = await Promise.all(
       banks.map(async (bank) => {

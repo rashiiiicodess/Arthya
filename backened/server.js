@@ -6,9 +6,9 @@ import cors from "cors";
 
 import cookieParser from "cookie-parser";
 import dns from "node:dns";
-import authRouter from "./Routes/authRoutes.js";
+import authRouter from "./routes/authRoutes.js";
 import { dbConnect } from "./config/mongodb.js";
-import userRouter from "./routes/userRoutes.js";
+import userRouter from "./routes/userRoutes.js"
 import BankRouter from "./routes/bankRoutes.js";
 import Analyzerouter from "./routes/analyzeRoutes.js";
 dns.setServers(["1.1.1.1", "8.8.8.8"]);
