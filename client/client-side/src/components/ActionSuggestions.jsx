@@ -1,82 +1,61 @@
 import React from 'react';
-import { ArrowRight, Zap, Info, Clock, Wallet, AlertCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { ArrowRight, Lightbulb, Target, TrendingDown, Calendar } from 'lucide-react';
 
 const ActionSuggestions = ({ recommended, status, salary }) => {
-  // 1. DEFENSIVE DATA EXTRACTION
   const emi = Number(recommended?.loan?.emi || 0);
-  const safeSalary = Number(salary || 0);
-  const moratoriumInterest = Number(recommended?.disbursement?.moratoriumInterest || 0);
 
-  // 2. DYNAMIC RECOVERY STEPS (Matches your screenshot's level of insight)
-  const dangerSuggestions = [
-    {
-      icon: <Wallet className="text-rose-500" />,
-      title: "Reduce your loan amount",
-      impact: "High Impact",
-      desc: `Your current EMI of ₹${Math.round(emi).toLocaleString('en-IN')} exceeds what your ₹${safeSalary.toLocaleString('en-IN')} salary can support. Borrowing less directly lowers your monthly obligation.`
-    },
-    {
-      icon: <Clock className="text-violet-500" />,
-      title: "Extend tenure beyond 10 years",
-      impact: "High Impact",
-      desc: "A longer repayment period spreads the same loan over more months, making each EMI smaller and potentially bringing it within your salary range."
-    },
-    {
-      icon: <Zap className="text-amber-500" />,
-      title: "Pay moratorium interest monthly",
-      impact: "Critical",
-      desc: `Your loan grows by ₹${moratoriumInterest.toLocaleString('en-IN')} during study. Paying interest monthly prevents this growth entirely.`
-    }
+  const container = {
+    hidden: { opacity: 0 },
+    show: { opacity: 1, transition: { staggerChildren: 0.1 } }
+  };
+
+  const itemAnim = {
+    hidden: { opacity: 0, x: -20 },
+    show: { opacity: 1, x: 0 }
+  };
+
+  const dangerActions = [
+    { title: "Reduce Principal", icon: <TrendingDown />, desc: "Borrowing less directly lowers your monthly burden." },
+    { title: "Extend Tenure", icon: <Calendar />, desc: "Spread the cost over 12-15 years to lower the EMI." },
+    { title: "Income Buffer", icon: <Target />, desc: "Ensure your starting salary is 2.5x the EMI before signing." }
   ];
 
-  // 3. Fallback to backend insights if not in danger
-  const backendInsights = recommended?.insights?.suggestions || [];
-  const displayItems = status === 'danger' ? dangerSuggestions : backendInsights;
-
-  // 4. Guard against empty state
-  if (displayItems.length === 0 && status !== 'danger') {
-    return null; 
-  }
-
   return (
-    <div className={`rounded-[40px] p-8 ${status === 'danger' ? 'bg-[#FFF1F2]/50 border border-rose-100' : 'bg-slate-50 border border-slate-100'}`}>
-      <div className="flex items-center gap-4 mb-8">
-        <div className={`p-3 rounded-2xl ${status === 'danger' ? 'bg-rose-100 text-rose-600' : 'bg-violet-100 text-violet-600'}`}>
-          {status === 'danger' ? <AlertCircle size={24} /> : <Zap size={24} />}
+    <div className="py-8">
+      <div className="flex items-center gap-3 mb-8 px-2">
+        <div className="p-2 bg-turquoise-50 text-turquoise-600 rounded-xl">
+          <Lightbulb size={20} />
         </div>
-        <div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">What you can do next</p>
-          <h3 className={`text-lg font-bold ${status === 'danger' ? 'text-rose-900' : 'text-slate-900'}`}>
-            {status === 'danger' 
-              ? "This plan is not financially feasible. Your monthly obligations would exceed your income." 
-              : "Optimize your loan path for long-term wealth."}
-          </h3>
-        </div>
+        <h3 className="text-xl font-bold text-slate-900 tracking-tight">AI Strategy Recommendations</h3>
       </div>
 
-      <div className="grid grid-cols-1 gap-4">
-        {displayItems.map((item, idx) => (
-          <div key={idx} className="bg-white border border-slate-100 p-6 rounded-[28px] flex items-center justify-between group hover:border-violet-300 transition-all cursor-pointer shadow-sm">
+      <motion.div 
+        variants={container}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-1 md:grid-cols-2 gap-4"
+      >
+        {dangerActions.map((action, i) => (
+          <motion.div 
+            key={i}
+            variants={itemAnim}
+            whileHover={{ scale: 1.02 }}
+            className="p-6 bg-white border border-slate-100 rounded-[2rem] flex items-center justify-between group cursor-pointer hover:border-turquoise-200 hover:shadow-xl hover:shadow-cyan-50/50 transition-all"
+          >
             <div className="flex items-center gap-5">
-              <div className="p-3 bg-slate-50 rounded-2xl group-hover:bg-violet-50 transition-colors">
-                {item.icon || <Info className="text-slate-400" size={20} />}
+              <div className="p-4 bg-slate-50 rounded-2xl text-slate-400 group-hover:bg-turquoise-50 group-hover:text-turquoise-500 transition-colors">
+                {action.icon}
               </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-3">
-                  <h4 className="font-bold text-slate-900 text-sm">{item.title}</h4>
-                  <span className="text-[9px] font-black bg-violet-100 text-violet-600 px-2 py-0.5 rounded-full uppercase tracking-tighter">
-                    {item.impact || "Actionable"}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 leading-relaxed max-w-xl">
-                  {item.desc || item.description}
-                </p>
+              <div>
+                <h4 className="font-bold text-slate-900 group-hover:text-turquoise-600 transition-colors">{action.title}</h4>
+                <p className="text-[11px] text-slate-500 font-medium leading-tight mt-1">{action.desc}</p>
               </div>
             </div>
-            <ArrowRight size={20} className="text-slate-300 group-hover:text-violet-600 group-hover:translate-x-1 transition-all" />
-          </div>
+            <ArrowRight size={18} className="text-slate-300 group-hover:text-turquoise-500 group-hover:translate-x-1 transition-all" />
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
     </div>
   );
 };

@@ -1,56 +1,117 @@
 import React from 'react';
-import { Brain, Quote } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Brain, ShieldCheck, Zap, Target, AlertCircle, TrendingUp } from 'lucide-react';
 
 const FinalVerdict = ({ recommended, salary }) => {
-  const aiText = recommended?.aiExplanation || "";
   const emi = Number(recommended?.loan?.emi || 0);
-  const ratio = salary > 0 ? Math.round((emi / salary) * 100) : 0;
+  const safeSalary = Number(salary || 0);
+  const ratio = safeSalary > 0 ? Math.round((emi / safeSalary) * 100) : 0;
+  
+  // 🚀 CONTENT CLEANING & PARTITIONING
+  const aiText = recommended?.aiExplanation || "";
+  
+  // Splits by '###', then cleans up extra stars and whitespace
+  const blocks = aiText.split('###').filter(s => s.trim().length > 0).map(block => {
+    const lines = block.trim().split('\n');
+    return {
+      title: lines[0].replace(/[*#]/g, '').trim(),
+      content: lines.slice(1).join(' ').replace(/[*#]/g, '').trim()
+    };
+  });
 
   return (
-    <div className="bg-slate-900 rounded-[48px] p-10 text-white relative overflow-hidden shadow-2xl">
-      {/* Decorative Background Elements */}
-      <div className="absolute top-0 right-0 w-64 h-64 bg-violet-600/20 rounded-full blur-[100px] -mr-32 -mt-32" />
-      <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-600/10 rounded-full blur-[100px] -ml-32 -mb-32" />
+    <div className="py-12 space-y-12 font-sans">
+      
+      {/* 1. HEADER: MATCHES YOUR 'FINANCIAL REALITY CHECK' STYLE */}
+      <div className="flex items-center gap-4 px-2">
+        <div className="p-3 bg-[#F0FDF4] border border-[#DCFCE7] rounded-2xl shadow-sm">
+          <Brain className="text-[#10B981]" size={24} />
+        </div>
+        <div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">AI Logic Engine</p>
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight text-emerald-950">Executive Verdict</h2>
+        </div>
+      </div>
 
-      <div className="relative z-10">
-        <div className="flex items-center gap-3 mb-8">
-          <div className="p-2 bg-violet-500/20 rounded-xl">
-            <Brain className="text-violet-400" size={24} />
-          </div>
-          <h3 className="text-xl font-black tracking-tight">AI Final Verdict</h3>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        
+        {/* 2. LEFT: CLEAN PARTITIONED BLOCKS (Easy to Read) */}
+        <div className="lg:col-span-8 space-y-6">
+          {blocks.map((block, idx) => (
+            <motion.div 
+              key={idx}
+              initial={{ opacity: 0, y: 10 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm hover:border-emerald-100 transition-all"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                 <div className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
+                 <h4 className="text-[10px] font-black text-[#10B981] uppercase tracking-[0.2em]">{block.title}</h4>
+              </div>
+              
+              <p className="text-slate-600 text-sm leading-relaxed font-medium">
+                {block.content}
+              </p>
+            </motion.div>
+          ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-          <div className="lg:col-span-7 space-y-6">
-            <div className="relative">
-              <Quote className="absolute -top-4 -left-6 text-slate-700" size={40} />
-              <div className="text-slate-300 text-sm leading-relaxed whitespace-pre-line font-medium italic">
-                {aiText}
-              </div>
+        {/* 3. RIGHT: THE SNAPSHOT (Matches your stat boxes) */}
+        <div className="lg:col-span-4 space-y-6 sticky top-8">
+          
+          <div className="bg-[#F0FDF4] border border-[#DCFCE7] rounded-[3rem] p-8 shadow-sm">
+            <div className="flex items-center gap-2 mb-10">
+               <ShieldCheck className="text-[#10B981]" size={18} />
+               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Final Conclusion</span>
+            </div>
+            
+            <div className="space-y-10">
+               <div>
+                 <p className="text-[10px] font-black text-slate-500 uppercase mb-2">EMI Obligation</p>
+                 <p className="text-4xl font-black text-slate-900">₹{Math.round(emi).toLocaleString('en-IN')}</p>
+                 <div className="mt-4 space-y-2">
+                    <div className="h-2 w-full bg-white rounded-full overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${ratio}%` }}
+                          className="h-full bg-[#10B981] rounded-full" 
+                        />
+                    </div>
+                    <p className="text-[10px] font-bold text-[#10B981] uppercase tracking-widest">{ratio}% of salary</p>
+                 </div>
+               </div>
+
+               <div className="pt-8 border-t border-[#DCFCE7]">
+                 <p className="text-[10px] font-black text-slate-500 uppercase mb-4">Verdict Status</p>
+                 <div className="bg-white px-5 py-4 rounded-2xl border border-[#DCFCE7] flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800">Recommendation</span>
+                    <span className="text-xs font-black text-[#10B981] uppercase tracking-widest">
+                        {ratio > 40 ? 'Caution' : 'Safe'}
+                    </span>
+                 </div>
+               </div>
+
+               <button className="w-full py-5 bg-[#10B981] text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-emerald-100 hover:scale-[1.02] active:scale-[0.98] transition-all">
+                  Generate PDF Summary
+               </button>
             </div>
           </div>
 
-          <div className="lg:col-span-5 bg-white/5 backdrop-blur-md rounded-[32px] p-8 border border-white/10 self-start">
-            <p className="text-[10px] font-black text-violet-400 uppercase tracking-widest mb-4">Summary Conclusion</p>
-            <div className="space-y-6">
-               <div>
-                 <p className="text-xs text-slate-400 mb-1 font-medium">Monthly Commitment</p>
-                 <p className="text-2xl font-black text-white">₹{Math.round(emi).toLocaleString('en-IN')}</p>
-                 <p className="text-[11px] text-slate-500 font-bold mt-1">~{ratio}% of your income</p>
-               </div>
-               
-               <div className="pt-6 border-t border-white/5">
-                 <p className="text-xs text-slate-400 mb-2 font-medium">Recommendation Status</p>
-                 <div className={`inline-flex px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider ${ratio > 50 ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-white'}`}>
-                    {ratio > 100 ? 'Rejected' : ratio > 40 ? 'Proceed with Caution' : 'Highly Recommended'}
-                 </div>
-               </div>
-            </div>
+          {/* Quick Insight Callout */}
+          <div className="p-6 bg-white border border-slate-100 rounded-[2rem] flex items-center gap-4 group">
+             <div className="p-3 bg-[#F0FDF4] rounded-full text-[#10B981]">
+                <Zap size={18} fill="currentColor" />
+             </div>
+             <p className="text-[11px] font-bold text-slate-500 leading-tight">
+                This loan is {ratio < 20 ? 'ideally' : 'moderately'} optimized for your ₹{safeSalary.toLocaleString()} salary profile.
+             </p>
           </div>
+
         </div>
       </div>
     </div>
   );
 };
 
-export default FinalVerdict;
+export default FinalVerdict;  

@@ -9,6 +9,7 @@ import ActionSuggestions from '../components/ActionSuggestions';
 import FullCostBreakdown from '../components/FullCostBreakdown';
 import LongTermImpact from '../components/LongTermImpact';
 import FinalVerdict from '../components/FinalVerdict';
+import LifestyleBuffer from '../components/LifestyleBuffer';
 
 export default function Dashboard({ data: propData, onReset }) {
   const [activeTab, setActiveTab] = useState('overview');
@@ -132,6 +133,7 @@ export default function Dashboard({ data: propData, onReset }) {
             <LongTermImpact recommended={winner} salary={salaryValue} />
             
             <FinalVerdict recommended={winner} salary={salaryValue} />
+            <LifestyleBuffer salary={salaryValue} emi={emiValue} />
           </motion.div>
         )}
       </AnimatePresence>
