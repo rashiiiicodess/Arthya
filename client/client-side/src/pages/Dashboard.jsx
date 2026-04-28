@@ -120,7 +120,12 @@ export default function Dashboard({ data: propData, onReset }) {
             
             <FinancialRealityCheck recommended={winner} salary={salaryValue} status={currentStatus} />
             
-            <ActionSuggestions recommended={winner} status={currentStatus} />
+          
+<ActionSuggestions 
+  recommended={winner} 
+  status={currentStatus} 
+  salary={salaryValue} 
+/>
             
             <FullCostBreakdown recommended={winner} />
             
