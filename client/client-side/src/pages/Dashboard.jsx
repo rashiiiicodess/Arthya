@@ -1,120 +1,135 @@
-import React, { useContext } from 'react';
-import { AppContext } from '../context/AppContext';
-import { 
-  LayoutDashboard, 
-  Wallet, 
-  Clock, 
-  CheckCircle2, 
-  ArrowUpRight, 
-  TrendingUp,
-  UserCheck
-} from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Plus } from 'lucide-react';
 
-const Dashboard = () => {
-  const { userData } = useContext(AppContext);
+// Import sub-components
+import DecisionHeader from '../components/DecisionHeader';
+import FinancialRealityCheck from '../components/FinancialRealityCheck';
+import ActionSuggestions from '../components/ActionSuggestions';
+import FullCostBreakdown from '../components/FullCostBreakdown';
+import LongTermImpact from '../components/LongTermImpact';
+import FinalVerdict from '../components/FinalVerdict';
 
-  // Dummy stats for the UI
-  const stats = [
-    { label: 'Active Loans', value: '$12,400', icon: Wallet, color: 'text-blue-600', bg: 'bg-blue-100' },
-    { label: 'Pending Approval', value: '2', icon: Clock, color: 'text-amber-600', bg: 'bg-amber-100' },
-    { label: 'Credit Score', value: '742', icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-100' },
-    { label: 'Verification', value: 'Verified', icon: UserCheck, color: 'text-purple-600', bg: 'bg-purple-100' },
-  ];
+export default function Dashboard({ data: propData, onReset }) {
+  const [activeTab, setActiveTab] = useState('overview');
+  
+  const [data, setData] = useState(() => {
+    if (propData) return propData;
+    const saved = sessionStorage.getItem("arthya_results");
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  useEffect(() => {
+    if (propData) setData(propData);
+  }, [propData]);
+
+  if (!data || !data.recommended) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <div className="w-12 h-12 border-4 border-violet-200 border-t-violet-600 rounded-full animate-spin"></div>
+        <p className="text-slate-500 font-medium font-sans">Aligning AI Analysis Results...</p>
+      </div>
+    );
+  }
+
+  // --- THE LOGIC HUB ---
+  const winner = data.recommended || data;
+  const allResults = data.results || [];
+  
+  // 1. Search for salary in the object
+  let salaryValue = Number(data.salary || data.input?.expectedSalary || 0);
+
+  // 2. 🚀 EMERGENCY EXTRACTION (Backup)
+  if (salaryValue === 0 && winner?.aiExplanation) {
+    const regex = /salary of ₹?([\d,]+)/i;
+    const match = winner.aiExplanation.match(regex);
+    if (match) {
+      salaryValue = Number(match[1].replace(/,/g, ''));
+    }
+  }
+
+  const emiValue = Number(winner?.loan?.emi || 0);
+  const principalValue = Number(winner?.loan?.netDisbursed || winner?.loanStartPrincipal || 0);
+  
+  // 3. 🚀 STATUS DETERMINATION
+  const emiRatio = salaryValue > 0 ? emiValue / salaryValue : 0;
+  let currentStatus = 'safe'; 
+  if (emiRatio >= 1) {
+    currentStatus = 'danger'; // EMI consumes 100%+ of salary
+  } else if (emiRatio > 0.4) {
+    currentStatus = 'neutral'; // EMI consumes 40%+ of salary
+  }
+
+  console.log("DEBUG DASHBOARD:", { 
+    rawSalary: data.salary, 
+    finalSalary: salaryValue,
+    emi: emiValue,
+    status: currentStatus
+  });
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-inter">
-      {/* Header Section */}
-      <div className="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-8 bg-[#FDFDFF] font-sans">
+      {/* Page Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-900">
-            Welcome back, {userData?.name || 'User'}! 👋
-          </h1>
-          <p className="text-slate-500 font-medium">Here's what's happening with your loans today.</p>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Your Loan Analysis</h1>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-slate-500 font-medium">
+              Based on ₹{(principalValue / 100000).toFixed(1)}L loan
+            </span>
+            <span className="text-slate-300">•</span>
+            <span className={salaryValue > 0 ? "text-slate-500 font-medium" : "text-rose-500 font-bold animate-pulse"}>
+              {salaryValue > 0 ? `₹${(salaryValue / 1000).toFixed(0)}K salary` : "Salary Missing!"}
+            </span>
+          </div>
         </div>
-        <button className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-2xl font-bold transition-all shadow-lg shadow-purple-100">
-          Apply for New Loan <ArrowUpRight size={20} />
+        <button 
+          onClick={onReset} 
+          className="bg-[#6D28D9] text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-purple-100 hover:scale-105 transition-all"
+        >
+          <Plus size={18} /> New Analysis
         </button>
       </div>
 
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((stat, i) => (
-            <div key={i} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-              <div className={`${stat.bg} ${stat.color} w-12 h-12 rounded-2xl flex items-center justify-center mb-4`}>
-                <stat.icon size={24} />
-              </div>
-              <p className="text-slate-500 text-sm font-semibold uppercase tracking-wider">{stat.label}</p>
-              <h3 className="text-2xl font-bold text-slate-800 mt-1">{stat.value}</h3>
-            </div>
-          ))}
-        </div>
-
-        {/* Main Content Area */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Recent Activity Table */}
-          <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-slate-50 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-slate-800">Recent Applications</h3>
-              <span className="text-purple-600 text-sm font-bold cursor-pointer hover:underline">View All</span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50/50">
-                    <th className="p-4 text-xs font-bold text-slate-400 uppercase">Loan Type</th>
-                    <th className="p-4 text-xs font-bold text-slate-400 uppercase">Amount</th>
-                    <th className="p-4 text-xs font-bold text-slate-400 uppercase">Status</th>
-                    <th className="p-4 text-xs font-bold text-slate-400 uppercase">Date</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {[
-                    { type: 'Personal Loan', amount: '$5,000', status: 'Approved', date: 'Apr 02, 2026', color: 'text-emerald-600' },
-                    { type: 'Business Expansion', amount: '$25,000', status: 'In Review', date: 'Mar 28, 2026', color: 'text-amber-600' },
-                    { type: 'Vehicle Finance', amount: '$12,000', status: 'Approved', date: 'Mar 15, 2026', color: 'text-emerald-600' },
-                  ].map((row, i) => (
-                    <tr key={i} className="hover:bg-slate-50/30 transition-colors">
-                      <td className="p-4 font-bold text-slate-700">{row.type}</td>
-                      <td className="p-4 font-medium text-slate-600">{row.amount}</td>
-                      <td className={`p-4 font-bold text-sm ${row.color}`}>
-                        <span className="flex items-center gap-1">
-                          <CheckCircle2 size={14} /> {row.status}
-                        </span>
-                      </td>
-                      <td className="p-4 text-slate-400 text-sm font-medium">{row.date}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Quick Actions / Tips */}
-          <div className="space-y-6">
-            <div className="bg-purple-600 rounded-3xl p-6 text-white shadow-xl shadow-purple-100 relative overflow-hidden group">
-              <div className="relative z-10">
-                <h3 className="text-xl font-bold mb-2">Boost your Score</h3>
-                <p className="text-purple-100 text-sm mb-4">Complete your professional profile to unlock better interest rates.</p>
-                <button className="bg-white text-purple-600 px-4 py-2 rounded-xl font-bold text-sm hover:bg-purple-50 transition-colors">
-                  Complete Profile
-                </button>
-              </div>
-              <LayoutDashboard className="absolute -right-4 -bottom-4 text-purple-500 opacity-20 rotate-12 group-hover:scale-110 transition-transform" size={120} />
-            </div>
-
-            <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
-              <h3 className="text-lg font-bold text-slate-800 mb-4">Support</h3>
-              <p className="text-slate-500 text-sm mb-4">Need help with your application? Our experts are available 24/7.</p>
-              <button className="w-full py-3 border-2 border-slate-100 rounded-2xl text-slate-600 font-bold hover:bg-slate-50 transition-all">
-                Contact Support
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Tabs System */}
+      <div className="flex gap-2 overflow-x-auto pb-2 border-b border-slate-100">
+        {['Overview', 'Insights', 'Compare', 'Invest', 'Simulate', 'Disbursement'].map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab.toLowerCase())}
+            className={`px-6 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${
+              activeTab === tab.toLowerCase() ? 'bg-[#6D28D9] text-white' : 'text-slate-400 hover:bg-slate-50'
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
       </div>
+
+      {/* Dynamic Content */}
+      <AnimatePresence mode="wait">
+        {activeTab === 'overview' && (
+          <motion.div 
+            key="overview"
+            initial={{ opacity: 0, y: 20 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            exit={{ opacity: 0, y: -20 }}
+            className="space-y-6"
+          >
+            <DecisionHeader recommended={winner} allResults={allResults} salary={salaryValue} />
+            
+            <FinancialRealityCheck recommended={winner} salary={salaryValue} status={currentStatus} />
+            
+            <ActionSuggestions recommended={winner} status={currentStatus} />
+            
+            <FullCostBreakdown recommended={winner} />
+            
+            <LongTermImpact recommended={winner} salary={salaryValue} />
+            
+            <FinalVerdict recommended={winner} salary={salaryValue} />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
-};
-
-export default Dashboard;
+}

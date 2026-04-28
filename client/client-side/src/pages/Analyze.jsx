@@ -10,31 +10,35 @@ const CHAR_IMG =
 export default function Analyze() {
   const navigate = useNavigate();
   const [isCalculating, setIsCalculating] = useState(false);
-
- const handleAnalyze = async (input) => {
+const handleAnalyze = async (input) => {
+  setIsCalculating(true);
   try {
-    const res = await fetch("/api/analyze", {
+    const res = await fetch("http://localhost:4002/api/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include", 
       body: JSON.stringify(input)
     });
 
     const data = await res.json();
 
-    if (!res.ok) {
-      throw new Error(data.error || "Something went wrong");
-    }
+    if (!res.ok) throw new Error(data.message || "Something went wrong");
 
-    // Store full backend response
-    sessionStorage.setItem("arthya_results", JSON.stringify(data));
+    // 🚀 THE FIX: Manually attach the input values to the result object
+    const enrichedData = {
+      ...data,
+      salary: input.expectedSalary || input.salary, // Save the salary you typed
+      input: input // Save the whole input object just in case
+    };
 
+    sessionStorage.setItem("arthya_results", JSON.stringify(enrichedData));
     navigate("/dashboard");
   } catch (err) {
     console.error(err);
-    alert("Failed to analyze loan. Try again.");
+    alert(err.message);
+    setIsCalculating(false);
   }
 };
-
   return (
     <div className="min-h-screen bg-[#FDFDFF] pb-20 font-sans">
       {/* Navigation Header */}
