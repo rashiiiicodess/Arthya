@@ -9,7 +9,10 @@ import ActionSuggestions from '../components/ActionSuggestions';
 import FullCostBreakdown from '../components/FullCostBreakdown';
 import LongTermImpact from '../components/LongTermImpact';
 import FinalVerdict from '../components/FinalVerdict';
+import InsightsView from '../components/InsightsView';
 import LifestyleBuffer from '../components/LifestyleBuffer';
+
+const ANALYZE_IMG = 'https://media.base44.com/images/public/69d145fab4e9dff45f4e4d66/a0f7c02aa_generated_image.png';
 
 export default function Dashboard({ data: propData, onReset }) {
   const [activeTab, setActiveTab] = useState('overview');
@@ -37,10 +40,8 @@ export default function Dashboard({ data: propData, onReset }) {
   const winner = data.recommended || data;
   const allResults = data.results || [];
   
-  // 1. Search for salary in the object
   let salaryValue = Number(data.salary || data.input?.expectedSalary || 0);
 
-  // 2. 🚀 EMERGENCY EXTRACTION (Backup)
   if (salaryValue === 0 && winner?.aiExplanation) {
     const regex = /salary of ₹?([\d,]+)/i;
     const match = winner.aiExplanation.match(regex);
@@ -52,13 +53,12 @@ export default function Dashboard({ data: propData, onReset }) {
   const emiValue = Number(winner?.loan?.emi || 0);
   const principalValue = Number(winner?.loan?.netDisbursed || winner?.loanStartPrincipal || 0);
   
-  // 3. 🚀 STATUS DETERMINATION
   const emiRatio = salaryValue > 0 ? emiValue / salaryValue : 0;
   let currentStatus = 'safe'; 
   if (emiRatio >= 1) {
-    currentStatus = 'danger'; // EMI consumes 100%+ of salary
+    currentStatus = 'danger'; 
   } else if (emiRatio > 0.4) {
-    currentStatus = 'neutral'; // EMI consumes 40%+ of salary
+    currentStatus = 'neutral'; 
   }
 
   console.log("DEBUG DASHBOARD:", { 
@@ -70,25 +70,45 @@ export default function Dashboard({ data: propData, onReset }) {
 
   return (
     <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-8 bg-[#FDFDFF] font-sans">
-      {/* Page Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Your Loan Analysis</h1>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-slate-500 font-medium">
-              Based on ₹{(principalValue / 100000).toFixed(1)}L loan
-            </span>
-            <span className="text-slate-300">•</span>
-            <span className={salaryValue > 0 ? "text-slate-500 font-medium" : "text-rose-500 font-bold animate-pulse"}>
-              {salaryValue > 0 ? `₹${(salaryValue / 1000).toFixed(0)}K salary` : "Salary Missing!"}
-            </span>
+      
+      {/* Page Header with Image Integration */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div className="flex items-center gap-5">
+          {/* 🚀 THE IMAGE: Styled with Brand Glow */}
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative shrink-0"
+          >
+            <div className="absolute inset-0 bg-[#6D28D9]/10 blur-2xl rounded-full" />
+            <img 
+              src={ANALYZE_IMG} 
+              alt="Analysis Visual" 
+              className="w-16 h-16 md:w-20 md:h-20 object-contain relative z-10 drop-shadow-2xl"
+            />
+          </motion.div>
+
+          <div>
+            <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
+              Your Loan Analysis
+            </h1>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-[11px] font-black text-[#6D28D9] uppercase tracking-widest bg-violet-50 px-2 py-1 rounded-md border border-violet-100">
+                Based on ₹{(principalValue / 100000).toFixed(1)}L loan
+              </span>
+              <span className="text-slate-300">•</span>
+              <span className={`text-[11px] font-black uppercase tracking-widest ${salaryValue > 0 ? "text-slate-500" : "text-rose-500 font-bold animate-pulse"}`}>
+                {salaryValue > 0 ? `₹${(salaryValue / 1000).toFixed(0)}K salary` : "Salary Missing!"}
+              </span>
+            </div>
           </div>
         </div>
+
         <button 
           onClick={onReset} 
-          className="bg-[#6D28D9] text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-purple-100 hover:scale-105 transition-all"
+          className="bg-[#6D28D9] text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center gap-2 shadow-xl shadow-purple-100 hover:bg-[#5B21B6] hover:-translate-y-1 transition-all active:scale-95"
         >
-          <Plus size={18} /> New Analysis
+          <Plus size={18} strokeWidth={3} /> New Analysis
         </button>
       </div>
 
@@ -108,35 +128,39 @@ export default function Dashboard({ data: propData, onReset }) {
       </div>
 
       {/* Dynamic Content */}
-      <AnimatePresence mode="wait">
-        {activeTab === 'overview' && (
-          <motion.div 
-            key="overview"
-            initial={{ opacity: 0, y: 20 }} 
-            animate={{ opacity: 1, y: 0 }} 
-            exit={{ opacity: 0, y: -20 }}
-            className="space-y-6"
-          >
-            <DecisionHeader recommended={winner} allResults={allResults} salary={salaryValue} />
-            
-            <FinancialRealityCheck recommended={winner} salary={salaryValue} status={currentStatus} />
-            
-          
-<ActionSuggestions 
-  recommended={winner} 
-  status={currentStatus} 
-  salary={salaryValue} 
-/>
-            
-            <FullCostBreakdown recommended={winner} />
-            
-            <LongTermImpact recommended={winner} salary={salaryValue} />
-            
-            <FinalVerdict recommended={winner} salary={salaryValue} />
-            <LifestyleBuffer salary={salaryValue} emi={emiValue} />
-          </motion.div>
-        )}
-      </AnimatePresence>
+     {/* Dynamic Content */}
+<AnimatePresence mode="wait">
+  {/* OVERVIEW TAB */}
+  {activeTab === 'overview' && (
+    <motion.div 
+      key="overview"
+      initial={{ opacity: 0, y: 20 }} 
+      animate={{ opacity: 1, y: 0 }} 
+      exit={{ opacity: 0, y: -20 }}
+      className="space-y-6"
+    >
+      <DecisionHeader recommended={winner} allResults={allResults} salary={salaryValue} />
+      <FinancialRealityCheck recommended={winner} salary={salaryValue} status={currentStatus} />
+      <ActionSuggestions recommended={winner} status={currentStatus} salary={salaryValue} />
+      <FullCostBreakdown recommended={winner} />
+      <LongTermImpact recommended={winner} salary={salaryValue} />
+      <FinalVerdict recommended={winner} salary={salaryValue} />
+      <LifestyleBuffer salary={salaryValue} emi={emiValue} />
+    </motion.div>
+  )}
+
+  {/* 🚀 INSIGHTS TAB (Add this block!) */}
+  {activeTab === 'insights' && (
+    <motion.div 
+      key="insights"
+      initial={{ opacity: 0, x: 20 }} 
+      animate={{ opacity: 1, x: 0 }} 
+      exit={{ opacity: 0, x: -20 }}
+    >
+      <InsightsView recommended={winner} />
+    </motion.div>
+  )}
+</AnimatePresence>
     </div>
   );
 }
