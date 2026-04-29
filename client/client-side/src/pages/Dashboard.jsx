@@ -11,7 +11,10 @@ import LongTermImpact from '../components/LongTermImpact';
 import FinalVerdict from '../components/FinalVerdict';
 import InsightsView from '../components/InsightsView';
 import LifestyleBuffer from '../components/LifestyleBuffer';
-
+import CompareView from '../components/CompareView';
+import InvestView from '../components/InvestView';
+import SimulateView from '../components/SimulateView';
+import DisbursementView from '../components/DisbursmentView';
 const ANALYZE_IMG = 'https://media.base44.com/images/public/69d145fab4e9dff45f4e4d66/a0f7c02aa_generated_image.png';
 
 export default function Dashboard({ data: propData, onReset }) {
@@ -160,6 +163,48 @@ export default function Dashboard({ data: propData, onReset }) {
       <InsightsView recommended={winner} />
     </motion.div>
   )}
+  {activeTab === 'compare' && (
+    <motion.div 
+      key="compare"
+      initial={{ opacity: 0, x: 20 }} 
+      animate={{ opacity: 1, x: 0 }} 
+      exit={{ opacity: 0, x: -20 }}
+    >
+      <CompareView 
+        results={allResults} 
+        salary={salaryValue} 
+        onBankClick={(bank) => {
+          console.log("Future Link to detailed bank page for:", bank.bankName);
+          // When we create the Detail page, we will navigate here
+        }}
+      />
+    </motion.div>
+  )}
+  {activeTab === 'invest' && (
+  <motion.div 
+    key="invest"
+    initial={{ opacity: 0, scale: 0.98 }} 
+    animate={{ opacity: 1, scale: 1 }} 
+    exit={{ opacity: 0 }}
+  >
+    <InvestView data={data} />
+  </motion.div>
+)}
+{activeTab === 'simulate' && (
+  <motion.div 
+    key="simulate"
+    initial={{ opacity: 0, scale: 0.98 }} 
+    animate={{ opacity: 1, scale: 1 }} 
+    exit={{ opacity: 0 }}
+  >
+   <SimulateView baseData={data} />
+  </motion.div>
+)}
+{activeTab === 'disbursement' && (
+      <motion.div key="disbursement" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        <DisbursementView baseData={data} />
+      </motion.div>
+    )}
 </AnimatePresence>
     </div>
   );

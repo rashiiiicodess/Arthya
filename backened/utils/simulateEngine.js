@@ -1,87 +1,72 @@
-import { calculateLoan } from "./loanCalculator.js";
+import { calculateLoan } from "./LoanCalculator";
 
 export function simulateScenario(basePlan, tweaks) {
-  // 1. Merge Base Plan with Tweaks
+  const simInsights = [];
+
+  // 1. Prepare Inputs
   const simulatedInput = {
-    principal: tweaks.loanAmount || basePlan.loan.netDisbursed,
-    annualRate: tweaks.interestRate || basePlan.bankRawInfo.interest.effective_mid,
-    tenureMonths: tweaks.tenureYears ? tweaks.tenureYears * 12 : basePlan.loan.tenureMonths,
-    salary: tweaks.salary || basePlan.input.salary,
+    principal: tweaks.loanAmount || basePlan?.loan?.netDisbursed || 1000000, 
+    annualRate: tweaks.interestRate || basePlan?.bankRawInfo?.interest?.effective_mid || 9.5,
+    tenureMonths: tweaks.tenureYears ? tweaks.tenureYears * 12 : (basePlan?.loan?.tenureMonths || 120),
+    salary: tweaks.salary || 50000 
   };
 
-  // 2. Run the math for the NEW scenario
+  // 2. RUN MATH FIRST (Crucial: Define simulatedLoan before using it for insights)
   const simulatedLoan = calculateLoan({
     principal: simulatedInput.principal,
     annualRate: simulatedInput.annualRate,
     tenureMonths: simulatedInput.tenureMonths,
-    // Note: Simulation usually assumes fees are already paid or constant
   });
 
-  // 3. Calculate Deltas (Differences)
-  const emiDelta = simulatedLoan.emi - basePlan.loan.emi;
-  const totalRepaymentDelta = simulatedLoan.totalRepayment - basePlan.overview.totalRepayment;
+  // 3. CALCULATE DELTAS
+  const emiDelta = simulatedLoan.emi - (basePlan?.loan?.emi || 0);
+  const totalRepaymentDelta = simulatedLoan.totalRepayment - (basePlan?.overview?.totalRepayment || 0);
   const emiToSalaryRatio = (simulatedLoan.emi / simulatedInput.salary) * 100;
 
-  // 4. Generate Dynamic Simulation Insights
-const simInsights = [];
+  // 4. DEEP INTELLIGENCE ENGINE
 
-// --- A. THE SURVIVAL ANALYSIS (Real-world Cashflow) ---
-const leftAfterEMI = simulatedInput.salary - simulatedLoan.emi;
+  // --- A. CAREER LOCKDOWN ---
+  if (emiToSalaryRatio > 35) {
+    simInsights.push({
+      title: "Career Lockdown",
+      text: `With ${emiToSalaryRatio.toFixed(0)}% of your pay gone, you cannot afford to quit a toxic job or join a high-growth startup. Your freedom is now restricted.`,
+      severity: "critical"
+    });
+  }
 
-if (leftAfterEMI < 15000 && leftAfterEMI > 0) {
-    simInsights.push({
-        category: "Survival",
-        title: "The 'Survival' Zone",
-        text: `After EMI, you only have ₹${leftAfterEMI.toLocaleString()} left. In a Tier-1 Indian city, this barely covers rent and basic groceries. You will have ₹0 for emergencies or travel.`,
-        severity: "medium"
-    });
-} else if (leftAfterEMI <= 0) {
-    simInsights.push({
-        category: "Survival",
-        title: "Financial Deadlock",
-        text: `This scenario is a deadlock. Your debt (₹${simulatedLoan.emi.toLocaleString()}) eats your entire income. You will be forced to rely on your parents or take more loans just to eat.`,
-        severity: "critical"
-    });
-}
+  // --- B. WEALTH VELOCITY / OPPORTUNITY COST ---
+  const tenYearLostWealth = Math.round(simulatedLoan.emi * 230); // 10yr SIP multiplier at 12%
+  simInsights.push({
+    title: "Opportunity Cost",
+    text: `Handing ₹${Math.round(simulatedLoan.emi).toLocaleString()} to the bank monthly blocks a potential ₹${(tenYearLostWealth/1000000).toFixed(1)} Cr corpus by Year 10.`,
+    severity: "high"
+  });
 
-// --- B. THE 'TENURE TRAP' (Long-term Wealth) ---
-if (totalRepaymentDelta > 0 && tweaks.tenureYears > basePlan.overview.years) {
-    const extraLakhs = (totalRepaymentDelta / 100000).toFixed(1);
+  // --- C. SURVIVAL & DEBT-FREE HORIZON ---
+  const leftAfterEMI = simulatedInput.salary - simulatedLoan.emi;
+  if (leftAfterEMI < 15000) {
     simInsights.push({
-        category: "Cost",
-        title: "The Wealth Leak",
-        text: `You lowered your EMI, but you just signed away ₹${extraLakhs} Lakhs of your future wealth. That money is equivalent to a downpayment for a house or 2 years of global travel that you've handed to the bank.`,
-        severity: "high"
+      title: "The 'Survival' Zone",
+      text: `After EMI, you only have ₹${Math.round(leftAfterEMI).toLocaleString()} left. In a Tier-1 city, this is below the living wage for a graduate.`,
+      severity: leftAfterEMI <= 0 ? "critical" : "high"
     });
-}
+  }
 
-// --- C. FLOATING RATE STRESS TEST (Future-Proofing) ---
-if (tweaks.interestRate > basePlan.bankRawInfo.interest.effective_mid) {
-    const rateDiff = (tweaks.interestRate - basePlan.bankRawInfo.interest.effective_mid).toFixed(1);
+  // --- D. POSITIVE PATHWAY ---
+  if (totalRepaymentDelta < -20000) {
     simInsights.push({
-        category: "Market Risk",
-        title: "The Inflation Hit",
-        text: `A ${rateDiff}% market rate hike isn't just a number—it increases your total debt by ₹${totalRepaymentDelta.toLocaleString()}. If the RBI raises rates, your 10-year plan just became ${((totalRepaymentDelta/basePlan.overview.totalRepayment)*100).toFixed(1)}% more expensive.`,
-        severity: "medium"
+      title: "Wealth Preservation",
+      text: `By optimizing this way, you prevent ₹${Math.abs(Math.round(totalRepaymentDelta)).toLocaleString()} from leaking out of your net worth.`,
+      severity: "low"
     });
-}
-
-// --- D. THE POSITIVE "PATHWAY" (Encouraging smart moves) ---
-if (totalRepaymentDelta < 0) {
-    simInsights.push({
-        category: "Freedom",
-        title: "Accelerated Freedom",
-        text: `By choosing this path, you save ₹${Math.abs(totalRepaymentDelta).toLocaleString()}. You will be debt-free earlier, allowing you to start investing in your 20s rather than just paying for your past.`,
-        severity: "low"
-    });
-}
+  }
 
   return {
     simulatedLoan,
     deltas: {
       emiDelta,
       totalRepaymentDelta,
-      ratioDelta: emiToSalaryRatio - (basePlan.loan.emi / basePlan.input.salary * 100)
+      ratioDelta: emiToSalaryRatio - ((basePlan?.loan?.emi / simulatedInput.salary) * 100)
     },
     riskLevel: emiToSalaryRatio > 40 ? "High Risk" : "Manageable",
     simInsights
