@@ -1,19 +1,16 @@
 /**
- * ARTHYA CORE LOAN UTILITIES
- * =========================
- * - formatCurrency: Indian Rupee formatting (en-IN)
- * - calculateLoan: Complex EMI engine with GST, Prepayments, and Rate Changes
+ * ARTHYA CORE LOAN UTILITIES - v2.0
+ * High-accuracy loan engine with moratorium, tranches, prepayments & GST
  */
 
 export function formatCurrency(amount) {
-  if (amount === null || amount === undefined || isNaN(amount)) {
-    return "₹0";
-  }
+  if (amount === null || amount === undefined || isNaN(amount)) return "₹0";
+  
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
     maximumFractionDigits: 0,
-  }).format(amount);
+  }).format(Math.round(amount));
 }
 
 export function calculateLoan({
@@ -27,29 +24,18 @@ export function calculateLoan({
   maxFeeCap = 0
 }) {
   let monthlyRate = annualRate / 12 / 100;
-  const GST_RATE = 1.18; // 18% GST
+  const GST_RATE = 1.18;
 
-  // Calculate fee based on %
+  // Processing Fee + GST
   let rawFee = (principal * processingFeePercent) / 100;
-
-  // Apply the Bank's Maximum Cap (if defined)
-  if (maxFeeCap > 0 && rawFee > maxFeeCap) {
-    rawFee = maxFeeCap;
-  }
-
-  // Calculate final fee including GST
+  if (maxFeeCap > 0 && rawFee > maxFeeCap) rawFee = maxFeeCap;
   const processingFee = Math.round(rawFee * GST_RATE);
-  
-  // What the student actually receives
   const netDisbursed = principal - processingFee;
-  
-  let emi =
-    monthlyRate === 0
-      ? principal / tenureMonths
-      : (principal *
-          monthlyRate *
-          Math.pow(1 + monthlyRate, tenureMonths)) /
-        (Math.pow(1 + monthlyRate, tenureMonths) - 1);
+
+  let emi = monthlyRate === 0 
+    ? principal / tenureMonths 
+    : (principal * monthlyRate * Math.pow(1 + monthlyRate, tenureMonths)) /
+      (Math.pow(1 + monthlyRate, tenureMonths) - 1);
 
   emi = Math.round(emi);
 
@@ -59,37 +45,32 @@ export function calculateLoan({
   let currentRate = monthlyRate;
 
   for (let month = 1; month <= tenureMonths + emiStartAfterMonths; month++) {
-    // --- RATE CHANGE ---
+    // Rate change handling
     const rateChange = rateChanges.find(r => r.month === month);
     if (rateChange) {
       currentRate = rateChange.newRate / 12 / 100;
-      const remainingMonths = tenureMonths - Math.max(0, month - emiStartAfterMonths);
-
-      if (remainingMonths > 0) {
-        emi = (currentBalance * currentRate * Math.pow(1 + currentRate, remainingMonths)) /
-              (Math.pow(1 + currentRate, remainingMonths) - 1);
+      const remaining = tenureMonths - Math.max(0, month - emiStartAfterMonths);
+      if (remaining > 0) {
+        emi = (currentBalance * currentRate * Math.pow(1 + currentRate, remaining)) /
+              (Math.pow(1 + currentRate, remaining) - 1);
         emi = Math.round(emi);
       }
     }
 
-    // --- MORATORIUM PHASE (EMI NOT STARTED) ---
+    // Moratorium Phase
     if (month <= emiStartAfterMonths) {
       const interest = currentBalance * currentRate;
       currentBalance += interest;
       totalInterest += interest;
 
       schedule.push({
-        month,
-        emi: 0,
-        interest: Math.round(interest),
-        principal: 0,
-        balance: Math.round(currentBalance),
-        note: "Moratorium Period"
+        month, emi: 0, interest: Math.round(interest), principal: 0,
+        balance: Math.round(currentBalance), note: "Moratorium"
       });
       continue;
     }
 
-    // --- REPAYMENT PHASE (EMI) ---
+    // Repayment Phase
     const interest = currentBalance * currentRate;
     let principalPaid = emi - interest;
 
@@ -100,9 +81,9 @@ export function calculateLoan({
 
     currentBalance -= principalPaid;
 
-    // --- PREPAYMENT LOGIC ---
+    // Prepayment
     const prepay = prepayments.find(p => p.month === month);
-    if (prepay) {
+    if (prepay && prepay.amount > 0) {
       currentBalance -= prepay.amount;
     }
 
@@ -124,7 +105,7 @@ export function calculateLoan({
     emi,
     netDisbursed: Math.round(netDisbursed),
     processingFee: Math.round(processingFee),
-    totalRepayment: Math.round(schedule.reduce((s, m) => s + m.emi, 0)),
+    totalRepayment: Math.round(schedule.reduce((sum, m) => sum + m.emi, 0)),
     interestDuringRepayment: Math.round(totalInterest),
     schedule
   };

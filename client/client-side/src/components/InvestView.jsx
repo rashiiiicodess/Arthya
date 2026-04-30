@@ -1,154 +1,211 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { 
-  TrendingUp, Wallet, AlertCircle, CheckCircle2, 
-  ArrowRight, ShieldCheck, PieChart, Info, 
-  Calendar, Landmark, Coins, Scale
+  TrendingUp, ShieldCheck, PieChart, Target, 
+  ArrowUpRight, AlertTriangle, CheckCircle2 
 } from 'lucide-react';
 
 export default function InvestView({ data }) {
   const winner = data?.recommended;
-  const guidance = winner?.investmentGuidance;
   const overview = winner?.overview;
   
-  const salary = data?.salary || 0;
+  const salary = data?.salary || 100000;
   const emi = overview?.emi || 0;
-  const remaining = overview?.monthlyShortfall || (salary - emi);
-  const score = overview?.affordabilityScore || 0;
+
+  const livingExpenses = Math.round(salary * 0.60);
+  const realSurplus = Math.max(0, salary - emi - livingExpenses);
   
-  const isNegative = remaining < 0;
+  const emiRatio = salary > 0 ? Math.round((emi / salary) * 100) : 0;
+  const isRisky = emiRatio >= 25;
+  const isTight = emiRatio >= 20;
+
+  const emergencyMin = Math.round(livingExpenses * 3);
+  const emergencyIdeal = Math.round(livingExpenses * 6);
+
+  const suggestedPrepay = Math.round(realSurplus * 0.40);
+  const suggestedSIP = Math.round(realSurplus * 0.35);
+
+  const score = Math.max(35, Math.min(98, 
+    Math.round(100 - (emiRatio * 2.1) - (realSurplus < 18000 ? 28 : 0))
+  ));
+
+  const getScoreColor = () => {
+    if (isRisky) return 'text-rose-600';
+    if (isTight) return 'text-amber-600';
+    return 'text-emerald-600';
+  };
 
   return (
-    <div className="space-y-8 pb-20 font-sans max-w-5xl mx-auto">
+    <div className="space-y-12 pb-24 font-sans max-w-7xl mx-auto px-4">
       
-      {/* --- 1. THE ADVISOR HEADER --- */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-slate-50 p-8 rounded-[2.5rem] border border-slate-100">
-        <div className="flex items-start gap-4">
-          <div className="p-3 bg-white rounded-2xl text-violet-600 shadow-sm border border-violet-50">
-            <TrendingUp size={28} />
-          </div>
+      {/* Hero Header */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-gradient-to-br from-violet-600 via-indigo-600 to-slate-900 text-white rounded-3xl p-10 md:p-14 shadow-xl"
+      >
+        <div className="flex flex-col md:flex-row justify-between items-start gap-8">
           <div>
-            <h2 className="text-xl font-black text-slate-900 tracking-tight italic">Arthya Wealth Engine</h2>
-            <p className="text-sm text-slate-500 font-medium mt-1 uppercase tracking-wider text-[10px]">Strategic Capital Allocation</p>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl">
+                <TrendingUp size={36} />
+              </div>
+              <h1 className="text-4xl md:text-5xl font-black tracking-tighter">Arthya Wealth Engine</h1>
+            </div>
+            <p className="text-violet-200 text-lg md:text-xl font-light">
+              Smart financial guidance for fresh graduates
+            </p>
+          </div>
+
+          {/* Affordability Score - Premium Card */}
+          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-8 text-center min-w-[200px]">
+            <p className="text-xs uppercase tracking-[3px] text-violet-200 font-medium mb-1">Affordability Score</p>
+            <div className={`text-7xl font-black tabular-nums ${getScoreColor()}`}>
+              {score}
+            </div>
+            <p className="text-sm text-white/70 -mt-2">/ 100</p>
+            
+            <div className={`mt-4 inline-flex items-center gap-2 px-5 py-2 rounded-full text-sm font-semibold
+              ${isRisky ? 'bg-rose-500/20 text-rose-300' : 
+                isTight ? 'bg-amber-500/20 text-amber-300' : 
+                'bg-emerald-500/20 text-emerald-300'}`}>
+              {isRisky ? 'High Risk' : isTight ? 'Moderate' : 'Healthy'}
+            </div>
           </div>
         </div>
+      </motion.div>
 
-        {/* Dynamic Affordability Meter */}
-        <div className="flex items-center gap-4 bg-white px-6 py-3 rounded-2xl border border-slate-200 shadow-sm">
-           <div>
-              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Affordability Score</div>
-              <div className="text-2xl font-black text-slate-900">{score}<span className="text-slate-300 text-sm">/100</span></div>
-           </div>
-           <div className={`w-12 h-12 rounded-full border-4 flex items-center justify-center font-black text-xs ${
-             score > 70 ? 'border-emerald-500 text-emerald-600' : score > 40 ? 'border-amber-400 text-amber-600' : 'border-rose-500 text-rose-600'
-           }`}>
-             {score}%
-           </div>
-        </div>
-      </div>
-
-      {/* --- 2. CASH FLOW DECONSTRUCTION --- */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
-        {/* The Math Breakdown */}
-        <div className="lg:col-span-2 bg-white border border-slate-100 rounded-[2.5rem] p-10 shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-8 opacity-5">
-            <Scale size={120} />
+        {/* Cash Flow Breakdown */}
+        <div className="lg:col-span-8 bg-white rounded-3xl border border-slate-100 shadow-sm p-10">
+          <div className="flex items-center gap-3 mb-10">
+            <PieChart className="text-violet-600" size={28} />
+            <h3 className="text-2xl font-semibold text-slate-900">Monthly Cashflow Reality</h3>
           </div>
 
-          <div className="flex items-center gap-2 mb-8">
-            <PieChart size={18} className="text-violet-500" />
-            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Monthly Liquidity Analysis</h4>
-          </div>
+          <div className="space-y-8">
+            {[
+              { label: "Gross Monthly Income", value: salary, color: "text-slate-900" },
+              { label: "Home Loan EMI", value: -emi, color: "text-rose-600", isNegative: true },
+              { label: "Living Expenses (60%)", value: -livingExpenses, color: "text-slate-700", isNegative: true },
+            ].map((item, i) => (
+              <motion.div 
+                key={i}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.1 }}
+                className="flex justify-between items-center py-4 border-b border-slate-100 last:border-none"
+              >
+                <span className="text-lg text-slate-600">{item.label}</span>
+                <span className={`text-2xl font-semibold tabular-nums ${item.color}`}>
+                  {item.isNegative ? '-' : ''}₹{Math.abs(item.value).toLocaleString('en-IN')}
+                </span>
+              </motion.div>
+            ))}
 
-          <div className="space-y-6 relative z-10">
-            <div className="flex justify-between items-end border-b border-slate-50 pb-4">
-               <span className="text-sm font-bold text-slate-500 uppercase tracking-tighter">Gross Monthly Income</span>
-               <span className="text-xl font-black text-slate-900 font-mono tracking-tighter">₹{salary.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between items-end border-b border-slate-50 pb-4">
-               <span className="text-sm font-bold text-slate-500 uppercase tracking-tighter">EMI Obligation</span>
-               <span className="text-xl font-black text-rose-500 font-mono tracking-tighter">- ₹{Math.round(emi).toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between items-end pt-2">
-               <div>
-                  <span className="text-sm font-black text-slate-900 uppercase tracking-tighter">Net Surplus (Investable)</span>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Available for SIPs / Prepayments</p>
-               </div>
-               <span className={`text-3xl font-black font-mono tracking-tighter ${isNegative ? 'text-rose-600' : 'text-emerald-500'}`}>
-                  ₹{Math.round(remaining).toLocaleString()}
-               </span>
+            <div className="pt-6 flex justify-between items-end">
+              <span className="text-xl font-semibold text-slate-900">Real Investable Surplus</span>
+              <div className="text-right">
+                <span className={`text-4xl font-black tabular-nums ${realSurplus < 20000 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                  ₹{realSurplus.toLocaleString('en-IN')}
+                </span>
+                <p className="text-sm text-slate-500">per month</p>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Milestone Card */}
-        <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white flex flex-col justify-between shadow-xl">
-           <div className="space-y-4">
-              <Calendar className="text-violet-400" size={32} />
-              <h5 className="font-black text-lg leading-tight uppercase italic">The Debt-Free Horizon</h5>
-              <p className="text-slate-400 text-xs font-medium leading-relaxed">
-                Based on your {overview?.years}-year tenure, your financial "rebirth" occurs in 
-                <span className="text-white font-bold px-1">{overview?.loanFreeYear}</span>. 
-                Until then, every ₹1 you save is worth {overview?.interestMultiplier}x in future value.
-              </p>
-           </div>
-           <div className="mt-8 pt-6 border-t border-slate-800">
-              <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 text-center">Interest Multiplier</div>
-              <div className="text-4xl font-black text-center text-violet-400 tracking-tighter">{overview?.interestMultiplier}x</div>
-           </div>
-        </div>
-      </div>
-
-      {/* --- 3. THE STRATEGY MATRIX --- */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
-        {/* Intelligence Strategy */}
-        <div className={`rounded-[2rem] p-8 border-2 transition-all ${isNegative ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-200 shadow-md shadow-emerald-100/50'}`}>
-          <div className="flex items-center gap-4 mb-6">
-            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
-               {isNegative ? <AlertCircle className="text-rose-500" /> : <Coins className="text-emerald-500" />}
+        {/* Emergency Fund */}
+        <div className="lg:col-span-4 bg-gradient-to-br from-emerald-50 to-white border border-emerald-100 rounded-3xl p-10 flex flex-col">
+          <div className="flex items-center gap-3 mb-8">
+            <ShieldCheck className="text-emerald-600" size={32} />
+            <h3 className="text-2xl font-semibold">Emergency Fund</h3>
+          </div>
+          
+          <div className="flex-1 space-y-8">
+            <div>
+              <p className="text-slate-500 text-sm">Minimum Target (3 months)</p>
+              <p className="text-3xl font-bold text-slate-900 mt-1">₹{emergencyMin.toLocaleString('en-IN')}</p>
             </div>
             <div>
-              <h5 className="font-black text-slate-900 uppercase text-xs tracking-tight">{guidance?.title || "Tactical Move"}</h5>
-              <p className={`text-[9px] font-black uppercase ${isNegative ? 'text-rose-600' : 'text-emerald-600'}`}>{guidance?.status}</p>
+              <p className="text-slate-500 text-sm">Ideal Target (6 months)</p>
+              <p className="text-3xl font-bold text-emerald-600 mt-1">₹{emergencyIdeal.toLocaleString('en-IN')}</p>
             </div>
           </div>
-          <h4 className="text-sm font-black text-slate-900 leading-snug mb-3">{guidance?.headline}</h4>
-          <p className="text-xs text-slate-600 font-medium leading-relaxed">
-            {guidance?.detailedAdvice}
-          </p>
+
+          <div className="mt-auto pt-8 border-t border-emerald-100">
+            <div className="flex items-center gap-2 text-emerald-700 text-sm">
+              <CheckCircle2 size={18} />
+              <span>Build this first before SIP or prepayment</span>
+            </div>
+          </div>
         </div>
-
-        {/* Prepayment vs. Investment Logic */}
-        <div className="bg-white border border-slate-100 rounded-[2rem] p-8 space-y-6">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-violet-500 animate-pulse" />
-            <h5 className="font-black text-slate-900 uppercase text-[10px] tracking-widest">Arthya Recommendation</h5>
-          </div>
-          
-          <div className="space-y-4">
-            <div className="flex items-start gap-3">
-              <CheckCircle2 size={16} className="text-violet-500 shrink-0 mt-0.5" />
-              <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
-                <span className="text-slate-900 font-bold tracking-tight uppercase text-[10px]">Priority 1:</span> 
-                {isNegative ? "Debt Restructuring. Your EMI is unsustainable for your current income." : `SIP of ₹${Math.round(remaining * 0.2).toLocaleString()} in Index Funds.`}
-              </p>
-            </div>
-            <div className="flex items-start gap-3">
-              <CheckCircle2 size={16} className="text-violet-500 shrink-0 mt-0.5" />
-              <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
-                <span className="text-slate-900 font-bold tracking-tight uppercase text-[10px]">Priority 2:</span> 
-                Aggressive prepayment to reduce the <span className="text-violet-600 font-bold">{overview?.interestMultiplier}x</span> loss.
-              </p>
-            </div>
-          </div>
-
-          
-        </div>
-
       </div>
 
+      {/* Recommended Allocation + Decision Framework */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        {/* Recommended Allocation */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white border border-slate-100 rounded-3xl p-10 shadow-sm"
+        >
+          <h3 className="text-2xl font-semibold mb-8 flex items-center gap-3">
+            <Target className="text-violet-600" size={28} />
+            Recommended Allocation
+          </h3>
+
+          <div className="space-y-6">
+            {[
+              { step: "01", title: "Emergency Fund First", desc: `Target ₹${emergencyMin.toLocaleString('en-IN')} – ₹${emergencyIdeal.toLocaleString('en-IN')}` },
+              { step: "02", title: "Loan Prepayment", desc: `₹${suggestedPrepay.toLocaleString('en-IN')}/month (Priority at 9.5% interest)` },
+              { step: "03", title: "Systematic Investment Plan", desc: `₹${suggestedSIP.toLocaleString('en-IN')}/month (After emergency buffer)` },
+            ].map((item, index) => (
+              <div key={index} className="flex gap-5 group">
+                <div className="w-10 h-10 rounded-2xl bg-violet-100 text-violet-700 flex items-center justify-center font-bold text-lg shrink-0 group-hover:bg-violet-600 group-hover:text-white transition-all">
+                  {item.step}
+                </div>
+                <div>
+                  <p className="font-semibold text-lg text-slate-900">{item.title}</p>
+                  <p className="text-slate-600 mt-1 leading-relaxed">{item.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* Decision Framework */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="bg-white border border-slate-100 rounded-3xl p-10 shadow-sm"
+        >
+          <h3 className="text-2xl font-semibold mb-8">Decision Framework</h3>
+          
+          <div className="space-y-8 text-[15px]">
+            <div className="p-6 bg-slate-50 rounded-2xl">
+              <p className="font-semibold text-slate-900 mb-2 flex items-center gap-2">
+                <ArrowUpRight className="text-violet-600" /> Financial Rule
+              </p>
+              <p className="text-slate-600">
+                At <span className="font-medium text-slate-900">9.5% loan rate</span>, it is currently <span className="font-semibold text-violet-600">better to prepay</span> 
+                rather than invest aggressively in equity.
+              </p>
+            </div>
+
+            <div className="p-6 bg-slate-50 rounded-2xl">
+              <p className="font-semibold text-slate-900 mb-2">Behavioral Rule</p>
+              <p className="text-slate-600">
+                Always treat <strong>EMI as non-negotiable</strong>, <strong>SIP as flexible</strong>, 
+                and <strong>Prepayment as opportunistic</strong> when you have surplus.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      </div>
     </div>
   );
 }
