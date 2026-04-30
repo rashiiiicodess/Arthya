@@ -10,21 +10,19 @@ export function calculateLoan({
 }) {
   let monthlyRate = annualRate / 12 / 100;
 
- const GST_RATE = 1.18; // 18% GST
+  const GST_RATE = 1.18;
 
-  // Calculate fee based on %
+  // Processing fee
   let rawFee = (principal * processingFeePercent) / 100;
 
-  // Apply the Bank's Maximum Cap (if defined)
   if (maxFeeCap > 0 && rawFee > maxFeeCap) {
     rawFee = maxFeeCap;
   }
 
-  // Calculate final fee including GST
   const processingFee = Math.round(rawFee * GST_RATE);
-  
-  // What the student actually receives
   const netDisbursed = principal - processingFee;
+
+  // EMI based on principal (loan amount)
   let emi =
     monthlyRate === 0
       ? principal / tenureMonths
@@ -41,29 +39,15 @@ export function calculateLoan({
   let currentRate = monthlyRate;
 
   for (let month = 1; month <= tenureMonths + emiStartAfterMonths; month++) {
-    // --- RATE CHANGE ---
     const rateChange = rateChanges.find(r => r.month === month);
+
     if (rateChange) {
       currentRate = rateChange.newRate / 12 / 100;
-
-      const remainingMonths =
-        tenureMonths - Math.max(0, month - emiStartAfterMonths);
-
-      if (remainingMonths > 0) {
-        emi =
-          (currentBalance *
-            currentRate *
-            Math.pow(1 + currentRate, remainingMonths)) /
-          (Math.pow(1 + currentRate, remainingMonths) - 1);
-
-        emi = Math.round(emi);
-      }
     }
 
-    // --- EMI NOT STARTED ---
+    // Moratorium phase
     if (month <= emiStartAfterMonths) {
       const interest = currentBalance * currentRate;
-
       currentBalance += interest;
       totalInterest += interest;
 
@@ -79,7 +63,6 @@ export function calculateLoan({
       continue;
     }
 
-    // --- EMI ---
     const interest = currentBalance * currentRate;
     let principalPaid = emi - interest;
 
@@ -90,7 +73,6 @@ export function calculateLoan({
 
     currentBalance -= principalPaid;
 
-    // --- PREPAYMENT ---
     const prepay = prepayments.find(p => p.month === month);
     if (prepay) {
       currentBalance -= prepay.amount;
@@ -110,10 +92,10 @@ export function calculateLoan({
     if (currentBalance <= 0) break;
   }
 
- return {
+  return {
     emi,
     netDisbursed: Math.round(netDisbursed),
-    processingFee: Math.round(processingFee), // Now contains GST
+    processingFee: Math.round(processingFee),
     totalRepayment: schedule.reduce((s, m) => s + m.emi, 0),
     interestDuringRepayment: Math.round(totalInterest),
     schedule

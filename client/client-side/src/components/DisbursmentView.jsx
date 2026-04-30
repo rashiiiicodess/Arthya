@@ -55,16 +55,16 @@ const redistribute = () => {
 
   // 2. EXECUTE ENGINE
   const result = useMemo(() => {
-    try {
-      return runDisbursementAnalysis({
-        ...params,
-        moratoriumPeriod: (params.courseDuration || 0) + (params.gracePeriod ?? 0.5),
-      });
-    } catch (e) {
-      console.error("Engine Error:", e);
-      return null;
-    }
-  }, [params]);
+  try {
+    return runDisbursementAnalysis({
+      ...params
+    });
+  } catch (e) {
+    console.error("Engine Error:", e);
+    return null;
+  }
+}, [params]);
+
 
   if (!result) return null;
 

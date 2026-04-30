@@ -1,7 +1,7 @@
 import { calculateLoan } from "./LoanCalculator";
 
 /* ───────────────────────────────
-   SUBSIDY LOGIC (CSIS MODEL)
+   SUBSIDY LOGIC
 ─────────────────────────────── */
 export function getSubsidyPolicy(parentalIncome) {
   if (!parentalIncome) {
@@ -9,7 +9,7 @@ export function getSubsidyPolicy(parentalIncome) {
       eligible: false,
       applySubsidy: false,
       label: "Unknown",
-      note: "Income data missing"
+      note: "Income missing"
     };
   }
 
@@ -18,7 +18,7 @@ export function getSubsidyPolicy(parentalIncome) {
       eligible: true,
       applySubsidy: true,
       label: "CSIS Eligible",
-      note: "Moratorium interest may be covered by government"
+      note: "Moratorium interest may be covered"
     };
   }
 
@@ -31,9 +31,9 @@ export function getSubsidyPolicy(parentalIncome) {
 }
 
 /* ───────────────────────────────
-   TRANCHE INTEREST (REAL MODEL)
+   TRANCHE INTEREST
 ─────────────────────────────── */
-function calcTrancheInterest(amount, annualRate, months, type = "simple") {
+function calcTrancheInterest(amount, annualRate, months, type = "compound") {
   const r = annualRate / 100 / 12;
   if (months <= 0) return 0;
 
@@ -45,7 +45,7 @@ function calcTrancheInterest(amount, annualRate, months, type = "simple") {
 }
 
 /* ───────────────────────────────
-   INSIGHTS ENGINE
+   INSIGHTS
 ─────────────────────────────── */
 function generateInsights({
   emi,
@@ -75,7 +75,7 @@ function generateInsights({
       {
         title: "Moratorium Interest Impact",
         means: `Loan accumulates ${fmt(moratoriumInterest)} during study.`,
-        action: "Reducing disbursement delay reduces total interest."
+        action: "Earlier disbursement reduces interest."
       }
     ],
 
@@ -91,11 +91,11 @@ function generateInsights({
       {
         title: "Subsidy Status",
         means: subsidyPolicy.eligible
-          ? "You are eligible for CSIS benefits (approval required)."
-          : "No subsidy applicable.",
+          ? "Eligible for CSIS benefits"
+          : "Not eligible",
         action: subsidyPolicy.eligible
-          ? "Apply with documentation to bank."
-          : "Focus on prepayment optimization."
+          ? "Apply with documents"
+          : "Optimize prepayment"
       }
     ],
 
@@ -121,13 +121,9 @@ export function runDisbursementAnalysis({
   surplusPrepayPct = 0
 }) {
   const moratoriumMonths = Math.round((courseDuration + gracePeriod) * 12);
-  const monthlyRate = interestRate / 12 / 100;
 
   const subsidy = getSubsidyPolicy(parentalIncome);
 
-  /* ───────────────────────────────
-     1. MORATORIUM INTEREST (REALISTIC)
-  ──────────────────────────────── */
   let totalMoratoriumInterest = 0;
 
   const breakdown = disbursements.map((t) => {
@@ -146,27 +142,19 @@ export function runDisbursementAnalysis({
     return {
       year: t.year,
       amount: t.amount,
-      accrualMonths: months,
       interest: Math.round(interest),
-      growsTo: Math.round(t.amount + interest),
-      interestPct: t.amount
-        ? Math.round((interest / t.amount) * 100)
-        : 0
+      growsTo: Math.round(t.amount + interest)
     };
   });
 
-  /* ───────────────────────────────
-     2. EFFECTIVE PRINCIPAL
-  ──────────────────────────────── */
   const basePrincipal = totalLoanAmount + loanInsurance;
 
-  const effectivePrincipal = subsidy.applySubsidy
-    ? basePrincipal
-    : basePrincipal + totalMoratoriumInterest;
+  const adjustedMoratorium = subsidy.applySubsidy
+    ? 0
+    : totalMoratoriumInterest;
 
-  /* ───────────────────────────────
-     3. EMI CALCULATION
-  ──────────────────────────────── */
+  const effectivePrincipal = basePrincipal + adjustedMoratorium;
+
   const tenureMonths = repaymentTenure * 12;
 
   const baseLoan = calculateLoan({
@@ -177,19 +165,17 @@ export function runDisbursementAnalysis({
 
   const emi = baseLoan.emi;
 
-  /* ───────────────────────────────
-     4. REAL SURPLUS MODEL
-  ──────────────────────────────── */
   const estimatedExpenses = expectedSalary * 0.5;
-  const realSurplus = Math.max(0, expectedSalary - emi - estimatedExpenses);
+  const realSurplus = expectedSalary - emi - estimatedExpenses;
+
+  const emiToSalaryRatio = Math.round((emi / expectedSalary) * 100);
+
+  const isDeficit = realSurplus < 0;
 
   const monthlyPrepay = Math.round(
-    realSurplus * (surplusPrepayPct / 100)
+    Math.max(0, realSurplus) * (surplusPrepayPct / 100)
   );
 
-  /* ───────────────────────────────
-     5. PREPAYMENT SIMULATION
-  ──────────────────────────────── */
   let moneySaved = 0;
   let tenureSaved = 0;
 
@@ -214,9 +200,9 @@ export function runDisbursementAnalysis({
     );
   }
 
-  /* ───────────────────────────────
-     6. FINAL OUTPUT
-  ──────────────────────────────── */
+  const totalInterest =
+    baseLoan.interestDuringRepayment + totalMoratoriumInterest;
+
   return {
     disbursementBreakdown: breakdown,
 
@@ -228,23 +214,21 @@ export function runDisbursementAnalysis({
     totalRepayment: baseLoan.totalRepayment,
 
     surplusDeficit: realSurplus,
-    monthlyPrepay,
+    isDeficit,
+    emiToSalaryRatio,
 
+    monthlyPrepay,
     moneySaved: Math.round(moneySaved),
     tenureSaved,
 
     percentages: {
-      principalPct: Math.round(
-        (basePrincipal / baseLoan.totalRepayment) * 100
-      ),
-
+      principalPct: Math.round((basePrincipal / baseLoan.totalRepayment) * 100),
       moratoriumPct: subsidy.applySubsidy
         ? 0
-        : Math.round(
-            (totalMoratoriumInterest / baseLoan.totalRepayment) * 100
-          ),
-
-      repaymentInterestPct: 100
+        : Math.round((totalMoratoriumInterest / baseLoan.totalRepayment) * 100),
+      repaymentInterestPct: Math.round(
+        (baseLoan.interestDuringRepayment / baseLoan.totalRepayment) * 100
+      )
     },
 
     subsidyPolicy: subsidy,
@@ -263,7 +247,7 @@ export function runDisbursementAnalysis({
 }
 
 /* ───────────────────────────────
-   DISBURSEMENT GENERATOR
+   GENERATOR
 ─────────────────────────────── */
 export function generateEqualDisbursements(totalAmount, courseDuration) {
   const n = Math.max(1, Math.round(courseDuration));
