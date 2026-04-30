@@ -1,69 +1,58 @@
 export function calculateLoan({
-  principal,
-  annualRate,
-  tenureMonths,
-  emiStartAfterMonths = 0,
-  prepayments = [],
-  rateChanges = [],
+  principal = 1000000,
+  annualRate = 9.5,
+  tenureMonths = 120,
+  moratoriumMonths = 30,
+  csisEligible = false,
+  disbursements = [],
   processingFeePercent = 0,
-  maxFeeCap = 0
 }) {
   let monthlyRate = annualRate / 12 / 100;
+  let currentBalance = principal;
+  let totalInterestAccrued = 0;           // All interest (moratorium + repayment)
+  let schedule = [];
 
-  const GST_RATE = 1.18;
-
-  // Processing fee
-  let rawFee = (principal * processingFeePercent) / 100;
-
-  if (maxFeeCap > 0 && rawFee > maxFeeCap) {
-    rawFee = maxFeeCap;
-  }
-
-  const processingFee = Math.round(rawFee * GST_RATE);
+  // === Processing Fee ===
+  const rawFee = (principal * processingFeePercent) / 100;
+  const processingFee = Math.round(rawFee * 1.18); // GST
   const netDisbursed = principal - processingFee;
 
-  // EMI based on principal (loan amount)
-  let emi =
-    monthlyRate === 0
-      ? principal / tenureMonths
-      : (principal *
-          monthlyRate *
-          Math.pow(1 + monthlyRate, tenureMonths)) /
-        (Math.pow(1 + monthlyRate, tenureMonths) - 1);
+  // === MORATORIUM PERIOD ===
+  for (let month = 1; month <= moratoriumMonths; month++) {
+    const interestThisMonth = currentBalance * monthlyRate;
+
+    if (csisEligible) {
+      // Government pays → interest not added to principal
+      totalInterestAccrued += interestThisMonth;
+    } else {
+      // No subsidy → interest capitalized
+      currentBalance += interestThisMonth;
+      totalInterestAccrued += interestThisMonth;
+    }
+
+    schedule.push({
+      month,
+      emi: 0,
+      interest: Math.round(interestThisMonth),
+      principal: 0,
+      balance: Math.round(currentBalance),
+      note: csisEligible ? "CSIS Subsidy" : "Interest Capitalized"
+    });
+  }
+
+  // === REPAYMENT PERIOD ===
+  const remainingMonths = tenureMonths;
+  let emi = monthlyRate === 0
+    ? currentBalance / remainingMonths
+    : (currentBalance * monthlyRate * Math.pow(1 + monthlyRate, remainingMonths)) /
+      (Math.pow(1 + monthlyRate, remainingMonths) - 1);
 
   emi = Math.round(emi);
 
-  let schedule = [];
-  let totalInterest = 0;
-  let currentBalance = principal;
-  let currentRate = monthlyRate;
+  let interestDuringRepayment = 0;   // ← This was missing / causing the error
 
-  for (let month = 1; month <= tenureMonths + emiStartAfterMonths; month++) {
-    const rateChange = rateChanges.find(r => r.month === month);
-
-    if (rateChange) {
-      currentRate = rateChange.newRate / 12 / 100;
-    }
-
-    // Moratorium phase
-    if (month <= emiStartAfterMonths) {
-      const interest = currentBalance * currentRate;
-      currentBalance += interest;
-      totalInterest += interest;
-
-      schedule.push({
-        month,
-        emi: 0,
-        interest: Math.round(interest),
-        principal: 0,
-        balance: Math.round(currentBalance),
-        note: "EMI not started"
-      });
-
-      continue;
-    }
-
-    const interest = currentBalance * currentRate;
+  for (let month = moratoriumMonths + 1; month <= moratoriumMonths + remainingMonths; month++) {
+    const interest = currentBalance * monthlyRate;
     let principalPaid = emi - interest;
 
     if (currentBalance < emi) {
@@ -72,13 +61,8 @@ export function calculateLoan({
     }
 
     currentBalance -= principalPaid;
-
-    const prepay = prepayments.find(p => p.month === month);
-    if (prepay) {
-      currentBalance -= prepay.amount;
-    }
-
-    totalInterest += interest;
+    interestDuringRepayment += interest;
+    totalInterestAccrued += interest;
 
     schedule.push({
       month,
@@ -86,18 +70,21 @@ export function calculateLoan({
       interest: Math.round(interest),
       principal: Math.round(principalPaid),
       balance: Math.max(0, Math.round(currentBalance)),
-      prepayment: prepay ? prepay.amount : 0
     });
 
     if (currentBalance <= 0) break;
   }
 
+  const totalRepayment = schedule.reduce((sum, entry) => sum + (entry.emi || 0), 0);
+
   return {
-    emi,
+    emi: Math.round(emi),
     netDisbursed: Math.round(netDisbursed),
     processingFee: Math.round(processingFee),
-    totalRepayment: schedule.reduce((s, m) => s + m.emi, 0),
-    interestDuringRepayment: Math.round(totalInterest),
+    totalRepayment: Math.round(totalRepayment),
+    interestDuringRepayment: Math.round(interestDuringRepayment),
+    moratoriumInterest: csisEligible ? 0 : Math.round(totalInterestAccrued - interestDuringRepayment),
+    effectivePrincipal: Math.round(principal + (csisEligible ? 0 : (totalInterestAccrued - interestDuringRepayment))),
     schedule
   };
 }

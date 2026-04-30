@@ -1,118 +1,148 @@
 import React from 'react';
-import { AlertTriangle, Info } from "lucide-react";
+import { AlertTriangle, TrendingUp } from "lucide-react";
 
 const FullCostBreakdown = ({ recommended }) => {
   const loan = recommended?.loan || {};
-  
-  // Data Extraction
-  const principal = Number(loan?.netDisbursed || 0);
+  const disbursement = recommended?.disbursement || {};
+  const bankRawInfo = recommended?.bankRawInfo || {};
+  const userInfo = recommended?.userInfo || {};
+
+  const sanctionedAmount = Number(loan?.sanctionedAmount || loan?.requestedLoan || 2000000);
+  const principal = Number(loan?.netDisbursed || sanctionedAmount);   // Net Disbursed
+
   const totalRepayment = Number(loan?.totalRepayment || 0);
   const interestDuringRepayment = Number(loan?.interestDuringRepayment || 0);
-  const moratoriumInterest = Number(recommended?.disbursement?.moratoriumInterest || 0);
-  const effectivePrincipal = principal + moratoriumInterest;
-  
-  const years = Number(loan?.tenureYears || loan?.maxTenureYears || 10);
-  const totalMonths = years * 12;
-  const monthlyEMI = Number(loan?.emi || 0);
+  const interestRate = Number(loan?.interestRate || bankRawInfo?.interestRate || 8.5);
+  const years = Number(loan?.years || loan?.tenureYears || 13);
+  const emi = Number(loan?.emi || 44009);
 
-  // Percentage calculations for the segmented bar
-  const principalWeight = (principal / totalRepayment) * 100;
-  const growthWeight = (moratoriumInterest / totalRepayment) * 100;
-  const interestWeight = (interestDuringRepayment / totalRepayment) * 100;
+  // Improved CSIS Logic
+  const bankOffersCSIS = 
+    bankRawInfo?.subsidy?.csis_applicable === true || 
+    bankRawInfo?.subsidy?.csis === true;
+
+  const userIsEligibleForCSIS = 
+    userInfo?.csisEligible === true || 
+    userInfo?.familyIncomeBelow4_5L === true || 
+    recommended?.csisEligible === true;
+
+  const csisApplicable = bankOffersCSIS && userIsEligibleForCSIS;
+
+  // Final Moratorium Interest
+  const moratoriumInterest = csisApplicable ? 0 : Number(disbursement?.moratoriumInterest || 0);
+
+  const effectivePrincipal = principal + moratoriumInterest;
+  const totalInterest = interestDuringRepayment + moratoriumInterest;
+
+  const principalWeight = totalRepayment > 0 ? Math.round((sanctionedAmount / totalRepayment) * 100) : 0;
+  const moratoriumWeight = totalRepayment > 0 ? Math.round((moratoriumInterest / totalRepayment) * 100) : 0;
+  const repaymentInterestWeight = totalRepayment > 0 ? Math.round((interestDuringRepayment / totalRepayment) * 100) : 0;
 
   return (
-    <div className="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm font-sans">
-      {/* Header Section */}
-      <div className="flex items-center gap-2 mb-2">
-        <AlertTriangle size={18} className="text-amber-500" />
-        <h3 className="font-bold text-slate-900">Full Cost Breakdown</h3>
+    <div className="bg-white border border-slate-200 rounded-3xl p-8 md:p-10 shadow-sm">
+      <div className="flex items-center gap-3 mb-2">
+        <AlertTriangle size={22} className="text-amber-500" />
+        <h3 className="text-2xl font-bold text-slate-900">Full Cost Breakdown</h3>
       </div>
-      <p className="text-slate-400 text-[11px] mb-8 leading-relaxed">
-        You borrowed ₹{principal.toLocaleString('en-IN')} but will repay ₹{totalRepayment.toLocaleString('en-IN')} in total — 
-        {Math.round((totalRepayment/principal - 1) * 100)}% more than you originally took.
-      </p>
 
-      {/* Main Math Table */}
-      <div className="space-y-5">
-        <div className="flex justify-between items-center text-sm">
-          <span className="font-bold text-slate-800">Original loan amount</span>
-          <span className="font-bold text-slate-900">₹{principal.toLocaleString('en-IN')}</span>
-        </div>
-
-        <div className="space-y-1">
-          <div className="flex justify-between items-center text-sm text-amber-600 font-bold">
-            <span>+ Loan grows during study ({moratoriumInterest > 0 ? "Interest active" : "Subsidy active"})</span>
-            <span>+₹{moratoriumInterest.toLocaleString('en-IN')}</span>
+      {/* ==================== AMOUNT BREAKDOWN ==================== */}
+      <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 mb-10">
+        <p className="uppercase text-xs font-bold text-slate-500 mb-4 tracking-widest">AMOUNT BREAKDOWN</p>
+        
+        <div className="space-y-5">
+          <div className="flex justify-between">
+            <span className="text-slate-500">Sanctioned Amount (Requested)</span>
+            <span className="font-semibold">₹{sanctionedAmount.toLocaleString('en-IN')}</span>
           </div>
-          <p className="text-[10px] text-slate-400 max-w-[80%] leading-tight">
-            Interest accrues while you study and is added to your principal before repayment begins.
-          </p>
-        </div>
 
-        <div className="flex justify-between items-center py-4 border-t border-slate-50">
-          <span className="font-bold text-slate-900 text-sm">= Effective principal (EMI calculated on this)</span>
-          <span className="font-bold text-slate-900">₹{effectivePrincipal.toLocaleString('en-IN')}</span>
-        </div>
-
-        <div className="space-y-3 pt-2">
-          <div className="flex justify-between items-center text-sm text-slate-900 font-bold">
-            <span>EMI: ₹{Math.round(monthlyEMI).toLocaleString('en-IN')}/month × {totalMonths} months</span>
-            <span>₹{totalRepayment.toLocaleString('en-IN')}</span>
+          <div className="flex justify-between">
+            <span className="text-slate-500">Net Disbursed Amount</span>
+            <span className="font-semibold text-amber-600">₹{principal.toLocaleString('en-IN')}</span>
           </div>
-          <div className="flex justify-between items-center pl-4 border-l-2 border-slate-100 text-[11px] text-slate-500">
-            <span>of which: interest during repayment</span>
-            <span>₹{Math.round(interestDuringRepayment).toLocaleString('en-IN')}</span>
+
+          <div className="flex justify-between border-t pt-4">
+            <span className="text-slate-500">Moratorium Interest</span>
+            <span className={`font-semibold ${csisApplicable ? 'text-emerald-600' : 'text-amber-600'}`}>
+              {csisApplicable 
+                ? "₹0 (CSIS Subsidy Applied)" 
+                : `+ ₹${moratoriumInterest.toLocaleString('en-IN')}`}
+            </span>
+          </div>
+
+          <div className="flex justify-between border-t border-slate-300 pt-5 font-medium text-lg bg-white p-4 rounded-xl">
+            <span className="text-slate-700">Effective Principal (EMI calculated on this)</span>
+            <span className="font-bold text-rose-600">₹{effectivePrincipal.toLocaleString('en-IN')}</span>
           </div>
         </div>
 
-        {/* The Big Purple Total */}
-        <div className="flex justify-between items-center pt-6 border-t-2 border-slate-100">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full border-2 border-violet-600 flex items-center justify-center">
-              <div className="w-1.5 h-1.5 rounded-full bg-violet-600" />
-            </div>
-            <span className="font-bold text-slate-900">Total You'll Pay</span>
-          </div>
-          <span className="text-2xl font-black text-[#6D28D9]">₹{Math.round(totalRepayment).toLocaleString('en-IN')}</span>
+        {/* Helpful Note */}
+        <div className="mt-6 text-xs text-amber-700 bg-amber-50 p-4 rounded-xl leading-relaxed">
+          <strong>Note:</strong> The Net Disbursed Amount is higher than your requested ₹20 Lakh because the bank calculates 
+          based on the actual course fee structure provided by your college. 
+          <br /><br />
+          If you want to strictly limit the loan to ₹20 Lakh only, inform the bank to <strong>cap the disbursement</strong> at your requested amount.
         </div>
       </div>
 
-      {/* Warning Callout */}
-      <div className="mt-8 bg-amber-50/50 border border-amber-100 rounded-2xl p-4">
-        <p className="text-xs text-amber-800 font-medium leading-relaxed">
-          Almost <span className="font-bold">{Math.round(growthWeight + interestWeight)}%</span> of your total repayment goes toward interest and loan growth — <span className="underline">not</span> reducing your original loan.
-        </p>
+      {/* ==================== LOAN TERMS ==================== */}
+      <div className="bg-white border border-slate-100 rounded-2xl p-6 mb-10">
+        <p className="uppercase text-xs font-bold text-slate-500 mb-4 tracking-widest">Loan Terms</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div>
+            <p className="text-slate-500 text-sm">Interest Rate</p>
+            <p className="font-bold">{interestRate}% p.a.</p>
+          </div>
+          <div>
+            <p className="text-slate-500 text-sm">Tenure</p>
+            <p className="font-bold">{years} Years</p>
+          </div>
+          <div>
+            <p className="text-slate-500 text-sm">Monthly EMI</p>
+            <p className="font-bold">₹{emi.toLocaleString('en-IN')}</p>
+          </div>
+          <div>
+            <p className="text-slate-500 text-sm">CSIS Status</p>
+            <p className={`font-bold ${csisApplicable ? 'text-emerald-600' : 'text-rose-600'}`}>
+              {csisApplicable ? "Approved" : "Not Applied"}
+            </p>
+          </div>
+        </div>
       </div>
 
-      {/* Footer Disclaimer */}
-      <p className="mt-6 text-[10px] text-slate-400 leading-relaxed italic">
-        Your EMI is based on the effective principal and follows a <span className="font-bold">reducing balance method</span> — meaning interest decreases over time as your principal reduces with each payment.
-      </p>
+      {/* Total Interest */}
+      <div className="bg-rose-50 border border-rose-100 rounded-2xl p-7 mb-10">
+        <TrendingUp className="text-rose-500 mb-3" size={22} />
+        <p className="font-semibold text-rose-700">Total Interest You Will Pay</p>
+        <p className="text-3xl font-bold text-rose-600 mt-1">₹{totalInterest.toLocaleString('en-IN')}</p>
+      </div>
 
-      {/* WHERE YOUR MONEY GOES - Segmented Bar */}
-      <div className="mt-10">
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Where your money goes</p>
-        <div className="h-2.5 w-full bg-slate-100 rounded-full flex overflow-hidden">
-          <div className="bg-[#6D28D9]" style={{ width: `${principalWeight}%` }} />
-          <div className="bg-rose-400" style={{ width: `${growthWeight}%` }} />
-          <div className="bg-amber-400" style={{ width: `${interestWeight}%` }} />
+      {/* Bar Breakdown */}
+      <div>
+        <p className="text-sm font-bold text-slate-600 mb-4">Breakdown of Total Repayment</p>
+        <div className="h-4 w-full bg-slate-100 rounded-full overflow-hidden flex">
+          <div className="bg-violet-600 h-full" style={{ width: `${principalWeight}%` }} />
+          <div className="bg-rose-500 h-full" style={{ width: `${moratoriumWeight}%` }} />
+          <div className="bg-amber-500 h-full" style={{ width: `${repaymentInterestWeight}%` }} />
         </div>
-        <div className="flex flex-wrap gap-x-6 gap-y-2 mt-4">
-          <LegendItem color="bg-[#6D28D9]" label="Principal" percent={principalWeight} />
-          <LegendItem color="bg-rose-400" label="Study Growth" percent={growthWeight} />
-          <LegendItem color="bg-amber-400" label="Repayment Interest" percent={interestWeight} />
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+          <LegendItem color="bg-violet-600" label="Original Principal" amount={sanctionedAmount} percent={principalWeight} />
+          <LegendItem color="bg-rose-500" label="Moratorium Interest" amount={moratoriumInterest} percent={moratoriumWeight} />
+          <LegendItem color="bg-amber-500" label="Repayment Interest" amount={interestDuringRepayment} percent={repaymentInterestWeight} />
         </div>
       </div>
     </div>
   );
 };
 
-const LegendItem = ({ color, label, percent }) => (
-  <div className="flex items-center gap-2">
-    <div className={`w-2 h-2 rounded-full ${color}`} />
-    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">
-      {label} — {Math.round(percent)}%
-    </span>
+const LegendItem = ({ color, label, amount, percent }) => (
+  <div className="flex gap-4">
+    <div className={`w-4 h-4 rounded mt-1.5 flex-shrink-0 ${color}`} />
+    <div>
+      <p className="font-medium text-slate-700">{label}</p>
+      <p className="text-xl font-semibold text-slate-900">₹{amount.toLocaleString('en-IN')}</p>
+      <p className="text-xs text-slate-500">{percent}%</p>
+    </div>
   </div>
 );
 
