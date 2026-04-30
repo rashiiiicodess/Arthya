@@ -1,130 +1,249 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { TriangleAlert, Info, Lightbulb, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
+import { 
+  TriangleAlert, Info, Lightbulb, CheckCircle2, 
+  ChevronDown, ChevronUp, AlertCircle 
+} from 'lucide-react';
+
+const INSIGHTS_IMG = 'https://media.base44.com/images/public/69d145fab4e9dff45f4e4d66/2f8d2703a_generated_image.png';
 
 export default function InsightsView({ recommended }) {
+  if (!recommended) {
+    return (
+      <div className="p-12 text-center">
+        <p className="text-amber-600">No recommendation data available.</p>
+      </div>
+    );
+  }
+
+  const { 
+    insights = {}, 
+    investmentGuidance, 
+    bankRawInfo, 
+    overview = {}, 
+    bankName = "SBI"
+  } = recommended;
+
   const [activeIdx, setActiveIdx] = useState(null);
 
-  // 🚀 Logic: Flatten all backend insights into one prioritized list
-  const raw = recommended?.insights || {};
+  // Realistic surplus calculation
+  const monthlyIncome = 99999;
+  const emi = Math.round(overview?.emi || 12891);
+  const postEmi = monthlyIncome - emi;
+  const estimatedExpenses = 55000;
+  const realisticSurplus = Math.max(postEmi - estimatedExpenses, 0);
+
   const allInsights = [
-    ...(raw.critical || []).map(i => ({ ...i, type: 'critical', icon: TriangleAlert, label: 'Critical Warnings' })),
-    ...(raw.warnings || []).map(i => ({ ...i, type: 'warning', icon: Info, label: 'Things to Consider' })),
-    ...(raw.suggestions || []).map(i => ({ ...i, type: 'suggestion', icon: Lightbulb, label: 'Smart Suggestions' })),
-    ...(raw.benefits || []).map(i => ({ ...i, type: 'benefit', icon: CheckCircle2, label: 'Smart Suggestions' }))
+    ...(insights.ai || []).map(item => ({
+      ...item,
+      type: 'critical',
+      icon: AlertCircle,
+      label: 'Strategic Considerations'
+    })),
+
+    ...(insights.critical || []).map(i => ({
+      ...i, type: 'critical', icon: TriangleAlert, label: 'Critical Warnings'
+    })),
+
+    ...(insights.warnings || []).map(i => ({
+      ...i, type: 'warning', icon: Info, label: 'Risk Factors'
+    })),
+
+    ...(insights.suggestions || []).map(i => ({
+      ...i, type: 'suggestion', icon: Lightbulb, label: 'Smart Moves'
+    })),
+
+    ...(bankRawInfo?.pros || []).map(pro => ({
+      title: pro,
+      type: 'benefit',
+      icon: CheckCircle2,
+      label: 'Bank Strengths',
+      impact: `${bankName} offers this advantage.`,
+      action: "Leverage this during your application."
+    })),
+
+    ...(bankRawInfo?.cons || []).map(con => ({
+      title: con,
+      type: 'warning',
+      icon: Info,
+      label: 'Bank Limitations',
+      impact: `Be prepared for this when working with ${bankName}.`,
+      action: "Discuss clearly with the branch officer."
+    })),
   ];
 
-  // Grouping by label for the section headers (e.g., "Critical Warnings")
   const grouped = allInsights.reduce((acc, curr) => {
-    if (!acc[curr.label]) acc[curr.label] = [];
-    acc[curr.label].push(curr);
+    const key = curr.label || 'Other Insights';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(curr);
     return acc;
   }, {});
 
   return (
-    <div className="space-y-12 pb-20">
-      {/* 🚀 DEEP LOAN INSIGHTS HEADER CARD */}
-      <div className="bg-[#F5F3FF] border border-[#DDD6FE] rounded-3xl p-8 flex flex-col md:flex-row items-center gap-6">
-        <div className="p-4 bg-white rounded-2xl shadow-sm">
-           <img src="https://media.base44.com/images/public/69d145fab4e9dff45f4e4d66/a0f7c02aa_generated_image.png" className="w-16 h-16 object-contain" alt="AI" />
+    <div className="max-w-5xl mx-auto space-y-16 pb-20 px-4">
+      
+      {/* Investment Guidance - Hero Card */}
+      {investmentGuidance?.status === "RECOMMENDED" && (
+        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-3xl p-8 md:p-10 shadow-sm">
+          <div className="flex flex-col md:flex-row gap-6 items-start">
+            <img 
+              src={INSIGHTS_IMG} 
+              alt="Investment Insight" 
+              className="w-16 h-16 object-contain flex-shrink-0" 
+            />
+            <div className="flex-1">
+              <h3 className="text-2xl font-bold text-emerald-900 mb-2">
+                {investmentGuidance.title}
+              </h3>
+              <p className="text-lg text-emerald-700 font-medium">{investmentGuidance.headline}</p>
+              <p className="mt-4 text-slate-700 leading-relaxed text-[15.5px]">
+                {investmentGuidance.detailedAdvice}
+              </p>
+              <div className="mt-6 inline-flex items-center gap-2 bg-white px-5 py-2.5 rounded-2xl border border-emerald-100">
+                <span className="text-emerald-600 font-semibold">Realistic Monthly Surplus:</span>
+                <span className="font-bold text-emerald-700 text-lg">
+                  ₹{realisticSurplus.toLocaleString('en-IN')}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
-        <div>
-          <h2 className="text-xl font-bold text-slate-900">Deep Loan Insights</h2>
-          <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-            Each insight below explains <span className="font-bold">why something matters</span>, <span className="font-bold">what consequences</span> it has for your future, and <span className="font-bold">what you should do</span> about it. Tap any card to expand.
-          </p>
-        </div>
-      </div>
+      )}
 
-      {/* 🚀 MAPPING THE GROUPED SECTIONS */}
-      {Object.entries(grouped).map(([label, items]) => (
-        <div key={label} className="space-y-4">
-          <div className="flex justify-between items-center px-2">
-            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
-              <span className={label.includes('Critical') ? 'text-rose-500' : label.includes('Things') ? 'text-amber-500' : 'text-emerald-500'}>
-                {items[0].type === 'critical' ? '▲' : items[0].type === 'warning' ? '▲' : '💡'}
-              </span>
+      {/* Main Insights Section */}
+      <div>
+        <div className="flex items-end justify-between mb-10">
+          <div>
+            <h2 className="text-3xl font-bold text-slate-900">Deep Loan Insights</h2>
+            <p className="text-slate-500 mt-2">What really matters for your future</p>
+          </div>
+          <div className="text-sm bg-slate-100 text-slate-500 px-4 py-2 rounded-full font-medium">
+            {allInsights.length} insights
+          </div>
+        </div>
+
+        {Object.entries(grouped).map(([label, items]) => (
+          <div key={label} className="mb-16">
+            <h3 className="uppercase tracking-[2px] text-xs font-bold text-slate-500 mb-6 px-1">
               {label}
             </h3>
-            <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">{items.length} item{items.length > 1 ? 's' : ''}</span>
-          </div>
 
-          {items.map((insight, idx) => {
-            const globalIdx = `${label}-${idx}`;
-            return (
-              <DetailedInsightCard 
-                key={globalIdx}
-                insight={insight}
-                isOpen={activeIdx === globalIdx}
-                toggle={() => setActiveIdx(activeIdx === globalIdx ? null : globalIdx)}
-              />
-            );
-          })}
-        </div>
-      ))}
+            <div className="space-y-5">
+              {items.map((insight, idx) => {
+                const globalIdx = `${label}-${idx}`;
+                return (
+                  <DetailedInsightCard
+                    key={globalIdx}
+                    insight={insight}
+                    isOpen={activeIdx === globalIdx}
+                    toggle={() => setActiveIdx(activeIdx === globalIdx ? null : globalIdx)}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
+/* ==================== Enhanced Insight Card ==================== */
 function DetailedInsightCard({ insight, isOpen, toggle }) {
   const themes = {
-    critical: { bg: 'bg-[#FFF1F2]', border: 'border-rose-100', text: 'text-rose-900', actionBg: 'bg-rose-100/50', actionText: 'text-rose-700', icon: <TriangleAlert className="text-rose-500" size={18} /> },
-    warning: { bg: 'bg-[#FFFBEB]', border: 'border-amber-100', text: 'text-amber-900', actionBg: 'bg-amber-100/50', actionText: 'text-amber-700', icon: <Info className="text-amber-500" size={18} /> },
-    benefit: { bg: 'bg-[#F0FDF4]', border: 'border-emerald-100', text: 'text-emerald-900', actionBg: 'bg-emerald-100/50', actionText: 'text-emerald-700', icon: <CheckCircle2 className="text-emerald-500" size={18} /> }
+    critical: { 
+      bg: 'bg-rose-50', 
+      border: 'border-rose-300', 
+      iconColor: 'text-rose-600',
+      actionBg: 'bg-rose-100' 
+    },
+    warning: { 
+      bg: 'bg-amber-50', 
+      border: 'border-amber-300', 
+      iconColor: 'text-amber-600',
+      actionBg: 'bg-amber-100' 
+    },
+    suggestion: { 
+      bg: 'bg-sky-50', 
+      border: 'border-sky-300', 
+      iconColor: 'text-sky-600',
+      actionBg: 'bg-sky-100' 
+    },
+    benefit: { 
+      bg: 'bg-emerald-50', 
+      border: 'border-emerald-300', 
+      iconColor: 'text-emerald-600',
+      actionBg: 'bg-emerald-100' 
+    },
   };
 
   const theme = themes[insight.type] || themes.warning;
+  const Icon = insight.icon || Info;
 
   return (
-    <div className={`${theme.bg} border ${theme.border} rounded-2xl overflow-hidden transition-all duration-300`}>
-      <button onClick={toggle} className="w-full p-6 text-left flex justify-between items-center">
-        <div className="flex items-center gap-4">
-          {theme.icon}
-          <div>
-            <h4 className="text-sm font-bold text-slate-900">{insight.title || insight.description}</h4>
-            <p className="text-[10px] font-medium text-slate-500 mt-0.5">Tap to understand why this matters →</p>
+    <div className={`${theme.bg} border ${theme.border} rounded-3xl overflow-hidden hover:shadow-lg transition-all duration-300`}>
+      <button
+        onClick={toggle}
+        className="w-full p-7 text-left flex justify-between items-start group"
+      >
+        <div className="flex gap-5 flex-1">
+          <div className="mt-1">
+            <Icon className={`${theme.iconColor}`} size={26} />
+          </div>
+          <div className="flex-1">
+            <h4 className="font-semibold text-lg text-slate-900 leading-tight pr-10">
+              {insight.title}
+            </h4>
+            {insight.explanation && (
+              <p className="text-slate-600 mt-3 text-[15px] leading-relaxed line-clamp-3">
+                {insight.explanation}
+              </p>
+            )}
           </div>
         </div>
-        {isOpen ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+        
+        <div className="text-slate-400 group-hover:text-slate-600 transition-colors mt-1">
+          {isOpen ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+        </div>
       </button>
 
       <AnimatePresence>
         {isOpen && (
-          <motion.div 
-            initial={{ height: 0, opacity: 0 }} 
-            animate={{ height: "auto", opacity: 1 }} 
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="px-6 pb-6"
+            className="overflow-hidden"
           >
-            <div className="space-y-6 pt-4 border-t border-black/5">
-              {/* WHY IS THIS HAPPENING */}
-              <div className="space-y-1.5">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Why is this happening?</p>
-                <p className="text-xs text-slate-700 leading-relaxed font-medium">
-                  {insight.reason || "This is based on the specific terms and conditions provided by the lender for this loan amount."}
-                </p>
-              </div>
+            <div className="px-7 pb-8">
+              <div className="pt-6 border-t border-slate-200 space-y-7">
+                {(insight.why || insight.explanation) && (
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">WHY THIS MATTERS</p>
+                    <p className="text-slate-700 text-[15px] leading-relaxed">
+                      {insight.why || insight.explanation}
+                    </p>
+                  </div>
+                )}
 
-              {/* WHAT DOES THIS MEAN FOR YOU */}
-              <div className="space-y-1.5">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">What does this mean for you?</p>
-                <p className="text-xs text-slate-700 leading-relaxed font-medium">
-                  {insight.impact || "This may affect your monthly cash flow and long-term financial stability if not managed correctly."}
-                </p>
-              </div>
+                {insight.impact && (
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-2">REAL IMPACT</p>
+                    <p className="text-slate-700 font-medium text-[15px] leading-relaxed">
+                      {insight.impact}
+                    </p>
+                  </div>
+                )}
 
-              {/* WHAT SHOULD YOU DO */}
-              {insight.action && (
-                <div className={`${theme.actionBg} p-4 rounded-xl border border-white/50`}>
-                   <div className="flex items-center gap-2 mb-1.5">
-                      <span className={`${theme.actionText}`}>→</span>
-                      <p className={`text-[9px] font-black uppercase tracking-widest ${theme.actionText}`}>What should you do?</p>
-                   </div>
-                   <p className={`text-xs font-bold leading-relaxed ${theme.actionText}`}>
+                {insight.action && (
+                  <div className={`${theme.actionBg} p-6 rounded-2xl border border-white/60`}>
+                    <p className="text-xs font-bold uppercase tracking-widest mb-3 text-emerald-700">✅ RECOMMENDED ACTION</p>
+                    <p className="text-slate-800 font-medium leading-relaxed">
                       {insight.action}
-                   </p>
-                </div>
-              )}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </motion.div>
         )}
